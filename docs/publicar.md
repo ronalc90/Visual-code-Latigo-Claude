@@ -65,7 +65,7 @@ Esos editores usan Open VSX en lugar del Marketplace de Microsoft. Con una cuent
 
 ```
 npx ovsx create-namespace ronalc90 -p <token>   # solo la primera vez
-npx ovsx publish latigo-claude-0.2.0.vsix -p <token>
+npx ovsx publish latigo-claude-<versión>.vsix -p <token>
 ```
 
 ### Versión en GitHub

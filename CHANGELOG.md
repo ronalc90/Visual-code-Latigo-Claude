@@ -1,5 +1,20 @@
 # Cambios
 
+## 0.3.0 · 2026-10-22
+
+Funciona igual en la consola y en el Claude de VS Code.
+
+### Plugin de Claude Code
+- **El effort sube de verdad con `/effort`:** el selector de modelo del chat de VS Code y el indicador de la consola muestran el nuevo nivel. `/latigo calma` y apagar devuelven el effort que tenías, y si lo cambiaste a mano por encima, se respeta.
+- **`/latigazo`:** latigazo al effort escrito en el chat (consola o VS Code). Sube el effort y deja el látigo en la conversación.
+- **Muestra desde el arranque el effort guardado** para el modelo.
+- 98 pruebas del plugin y 22 de punta a punta con Claude Code real.
+
+### Extensión de VS Code
+- **Ícono propio en la barra de la izquierda**, con un diseño para el ancho de la barra lateral.
+- **Se abre sola al entrar a una conversación de Claude Code** si el látigo está prendido, sin quitarle el foco al chat. Ajuste `latigo.showWithClaude`.
+- 121 pruebas unitarias y 19 en un VS Code real.
+
 ## 0.2.0 · 2026-10-22
 
 ### Plugin de Claude Code

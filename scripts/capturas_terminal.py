@@ -6,8 +6,9 @@ de terminal (pyte) y la dibuja en PNG con los colores reales.
 
 No manda ningun mensaje al modelo: solo abre la sesion, enfoca la banda y le da
 latigazos. Antes de cada escena deja en el puente temporal el total de latigazos
-que la escena necesita. Al final borra lo que las sesiones de prueba dejaron: el
-almacen del plugin cargado con --plugin-dir y sus transcripciones vacias.
+que la escena necesita. Al final deja todo como estaba: ~/.claude/settings.json
+(el latigo cambia el effort con /effort, que se guarda ahi), el almacen del plugin
+cargado con --plugin-dir y las transcripciones vacias de las sesiones de prueba.
 
 Uso (desde la raiz del repo, con un venv que tenga pyte, pillow y fonttools):
     python scripts/capturas_terminal.py --claude <ruta al binario> --out docs/img
@@ -38,19 +39,29 @@ BRIDGE = TEST_HOME / ".claude-latigo"
 # El almacen propio del plugin cuando corre con --plugin-dir, y las transcripciones
 # vacias que dejan las sesiones de prueba en esta carpeta.
 PLUGIN_STORE = Path.home() / ".claude" / "plugins" / "store"
+# El latigo usa /effort, que Claude Code guarda como predeterminado en settings.json.
+USER_SETTINGS = Path.home() / ".claude" / "settings.json"
 TRANSCRIPTS = Path.home() / ".claude" / "projects" / str(REPO).replace("/", "-")
+
+
+_original_settings: bytes | None = None
 
 
 class Sandbox:
     """Guarda lo que las sesiones de prueba tocan y lo deja como estaba al salir."""
 
     def __enter__(self) -> "Sandbox":
+        global _original_settings
+        self.settings = USER_SETTINGS.read_bytes() if USER_SETTINGS.exists() else None
+        _original_settings = self.settings
         self.stores = {p.name: p.read_bytes() for p in PLUGIN_STORE.glob("latigo_inline-*.json")}
         self.had_transcripts = TRANSCRIPTS.exists()
         self.transcripts = set(TRANSCRIPTS.glob("*")) if self.had_transcripts else set()
         return self
 
     def __exit__(self, *exc: object) -> None:
+        if self.settings is not None:
+            USER_SETTINGS.write_bytes(self.settings)
         for path in PLUGIN_STORE.glob("latigo_inline-*.json"):
             if path.name in self.stores:
                 path.write_bytes(self.stores[path.name])
@@ -65,9 +76,12 @@ class Sandbox:
 
 
 def clear_plugin_store() -> None:
-    """Cada escena arranca sin conteos guardados en el almacen del plugin."""
+    """Cada escena arranca sin conteos guardados en el almacen del plugin, y con
+    el effort guardado que la persona tenia (una escena anterior pudo subirlo)."""
     for path in PLUGIN_STORE.glob("latigo_inline-*.json"):
         path.unlink()
+    if _original_settings is not None:
+        USER_SETTINGS.write_bytes(_original_settings)
 COLS, ROWS = 118, 30
 
 FONT_MAIN = "/System/Library/Fonts/Menlo.ttc"
@@ -302,6 +316,10 @@ def main() -> None:
             ("", focus, 0.4),
             ("golpe", b"e", 0.47),
         ])
+        scene(args.claude, cwd, out, "terminal-latigazo", "claude · /latigazo en el chat", 1320, [
+            ("", b"/latigazo", 0.6),
+            ("chat", b"\r", 2.5),
+        ], full=True)
         scene(args.claude, cwd, out, "terminal-apagado", "claude · látigo apagado", 230, [
             ("", focus + b"o", 0.6),
             ("banda", b"", 0.1),

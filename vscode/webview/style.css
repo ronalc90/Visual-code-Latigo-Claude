@@ -829,3 +829,66 @@ button {
     max-width: 48%;
   }
 }
+
+/* --- Barra lateral (angosta) --- */
+
+html,
+body {
+  overflow-x: hidden;
+}
+
+.app {
+  min-width: 0;
+}
+
+.controls {
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+
+@media (max-width: 520px) {
+  .app {
+    padding: 10px 12px 14px;
+  }
+
+  .topbar {
+    gap: 10px;
+  }
+
+  .switch-big .switch-label {
+    min-width: 0;
+  }
+
+  .stage {
+    min-height: 330px;
+  }
+
+  /* Los blancos pasan abajo, lado a lado; el latigo les sigue apuntando. */
+  .targets {
+    top: auto;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    transform: none;
+    width: auto;
+    flex-direction: row;
+    gap: 10px;
+  }
+
+  .target {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 8px 10px 9px;
+  }
+
+  .target-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .top-days li {
+    grid-template-columns: 14px 78px minmax(0, 1fr) 40px;
+    gap: 6px;
+  }
+}

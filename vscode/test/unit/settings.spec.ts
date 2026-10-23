@@ -13,11 +13,17 @@ describe('readSettings', () => {
   })
 
   it('lee los valores validos', () => {
-    assert.deepEqual(readSettings(source({ showStatusBar: false, reducedMotion: 'on', volume: 0.25 })), {
+    assert.deepEqual(readSettings(source({ showWithClaude: false, showStatusBar: false, reducedMotion: 'on', volume: 0.25 })), {
+      showWithClaude: false,
       showStatusBar: false,
       reducedMotion: 'on',
       volume: 0.25,
     })
+  })
+
+  it('mostrar el latigo al entrar a Claude viene prendido y solo acepta booleanos', () => {
+    assert.equal(DEFAULT_SETTINGS.showWithClaude, true)
+    assert.equal(readSettings(source({ showWithClaude: 'no' })).showWithClaude, true)
   })
 
   it('acota el volumen entre 0 y 1 y descarta valores raros', () => {

@@ -186,4 +186,69 @@ describe('Látigo en VS Code', () => {
     await config.update('showStatusBar', undefined, vscode.ConfigurationTarget.Global)
     assert.match(api.statusBarText(), /Látigo/)
   })
+
+  describe('al entrar a una conversacion de Claude Code', () => {
+    const openClaudeConversation = (title: string) =>
+      vscode.window.createWebviewPanel('claudeVSCodePanel', title, vscode.ViewColumn.One, {})
+
+    const activeTabIsClaude = () => {
+      const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input
+      return input instanceof vscode.TabInputWebview && input.viewType.endsWith('claudeVSCodePanel')
+    }
+
+    const setEnabled = async (enabled: boolean) => {
+      writeBridge(api, 'config.json', { version: 1, enabled, sound: false })
+      await waitFor(() => api.snapshot().config.enabled === enabled)
+    }
+
+    afterEach(async () => {
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
+      await setEnabled(true)
+      await vscode.workspace.getConfiguration('latigo').update('showWithClaude', undefined, vscode.ConfigurationTarget.Global)
+    })
+
+    it('con el latigo prendido lo muestra en la barra lateral sin quitarle el foco a la conversacion', async () => {
+      await setEnabled(true)
+      await vscode.commands.executeCommand('workbench.action.closeSidebar')
+      await waitFor(() => !api.panelVisible())
+      const conversation = openClaudeConversation('Charla con Claude')
+      await waitFor(() => api.panelVisible(), 10000)
+      assert.ok(activeTabIsClaude(), 'la pestaña activa sigue siendo la conversacion')
+      assert.ok(conversation.active)
+      conversation.dispose()
+    })
+
+    it('con el latigo apagado no lo muestra', async () => {
+      await setEnabled(false)
+      await vscode.commands.executeCommand('workbench.action.closeSidebar')
+      await waitFor(() => !api.panelVisible())
+      const conversation = openClaudeConversation('Otra charla')
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      assert.equal(api.panelVisible(), false)
+      conversation.dispose()
+    })
+
+    it('con el ajuste showWithClaude apagado no lo muestra', async () => {
+      await setEnabled(true)
+      await vscode.workspace.getConfiguration('latigo').update('showWithClaude', false, vscode.ConfigurationTarget.Global)
+      await vscode.commands.executeCommand('workbench.action.closeSidebar')
+      await waitFor(() => !api.panelVisible())
+      const conversation = openClaudeConversation('Charla sin latigo')
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      assert.equal(api.panelVisible(), false)
+      conversation.dispose()
+    })
+
+    it('prenderlo estando en la conversacion lo muestra de una vez', async () => {
+      await setEnabled(false)
+      await vscode.commands.executeCommand('workbench.action.closeSidebar')
+      const conversation = openClaudeConversation('Charla para prender')
+      await new Promise(resolve => setTimeout(resolve, 800))
+      assert.equal(api.panelVisible(), false)
+      await vscode.commands.executeCommand(COMMANDS.toggle)
+      await waitFor(() => api.panelVisible(), 10000)
+      assert.ok(activeTabIsClaude())
+      conversation.dispose()
+    })
+  })
 })

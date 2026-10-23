@@ -33,16 +33,24 @@ Las dos comparten **las mismas reglas** (módulos puros en `hooks/`) y se hablan
 
 ## Cómo sube el effort
 
-Claude Code avisa a los plugins antes de cada pedido al modelo con el evento `turn.step`, que trae el `effort` de ese pedido y permite cambiarlo. El plugin guarda un **effort forzado** (`boost`) y, si es mayor que el del pedido, lo reemplaza:
+El latigazo al effort usa el mismo comando de Claude Code, `/effort`, que es lo que muestran el selector de modelo del chat de VS Code y el indicador de la consola:
 
 ```
-turn.step(effort = medium)  ──►  boost = xhigh  ──►  sale el pedido con effort = xhigh
-turn.step(effort = max)     ──►  boost = xhigh  ──►  sale con max (nunca baja)
-turn.step(agentId = …)      ──►  subagente      ──►  no se toca
-látigo apagado              ──►                 ──►  sale el effort de la sesión
+latigazo  ──►  boost = high  ──►  /effort high  ──►  selector "Opus 5.5 High", indicador "● high"
+calma / apagar  ──►  /effort <el de antes>       (solo si nadie lo cambió a mano)
 ```
 
-El indicador propio de Claude Code (`◐ medium · /effort`) sigue mostrando el effort de la sesión. Lo que el látigo fuerza se ve en la banda con ⚡ y es lo que de verdad viaja en cada pedido.
+- **Desde adentro de otro comando** (`/latigazo`, `/latigo calma`), Claude Code no deja correr `/effort` en ese momento. El plugin lo deja pendiente y lo corre la revisión periódica (cada 0,6 s).
+- **Como respaldo, `turn.step`** sube cada pedido al modelo si el effort que sale es menor que el forzado. Nunca baja uno mayor y no toca los subagentes.
+- **Al arrancar**, el plugin lee el effort guardado para el modelo en `~/.claude/settings.json` para mostrarlo en la banda antes del primer pedido.
+- **Claude Code guarda `/effort` como predeterminado** para sesiones nuevas (salvo `max`), y calmar el látigo lo devuelve.
+
+## Claude Code en VS Code
+
+El chat de Claude Code en VS Code (versión 2.1.293) no dibuja interfaz de plugins: su código no tiene `ui_render`, y VS Code no deja que otra extensión dibuje ni escuche clics dentro de su ventana. Por eso:
+
+- **Los comandos** (`/latigazo`, `/latigo …`) y el cambio de effort funcionan igual que en la consola, porque el chat usa el mismo motor.
+- **El látigo animado** lo pone la extensión en su vista de la barra de la izquierda. `ClaudeFocusWatcher` mira las pestañas: cuando la activa es una conversación de Claude (`viewType` `claudeVSCodePanel`) y el látigo está prendido, muestra la vista sin quitarle el foco al chat.
 
 ## El puente: `~/.claude-latigo/`
 

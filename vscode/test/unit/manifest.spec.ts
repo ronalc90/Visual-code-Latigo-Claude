@@ -13,7 +13,7 @@ type Manifest = {
   contributes: {
     commands: Array<{ command: string; title: string; category: string }>
     keybindings: Array<{ command: string; key: string; mac: string; linux?: string; win?: string }>
-    viewsContainers: { panel: Array<{ id: string; icon: string }> }
+    viewsContainers: { activitybar: Array<{ id: string; icon: string }> }
     views: Record<string, Array<{ id: string; type: string }>>
     menus: Record<string, Array<{ command: string; when?: string }>>
     configuration: { properties: Record<string, { default: unknown }> }
@@ -50,8 +50,8 @@ describe('package.json', () => {
     }
   })
 
-  it('el panel vive en su propio contenedor del area inferior', () => {
-    const container = manifest.contributes.viewsContainers.panel.find(item => item.id === VIEW_CONTAINER_ID)
+  it('el latigo tiene su icono en la barra de actividad de la izquierda', () => {
+    const container = manifest.contributes.viewsContainers.activitybar.find(item => item.id === VIEW_CONTAINER_ID)
     assert.ok(container)
     assert.ok(fs.existsSync(path.join(root, container.icon)))
     assert.deepEqual(manifest.contributes.views[VIEW_CONTAINER_ID]?.map(view => [view.id, view.type]), [[VIEW_ID, 'webview']])

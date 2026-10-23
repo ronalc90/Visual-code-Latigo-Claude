@@ -69,6 +69,10 @@ let isSavingConfig = false
 let polls = 0
 /** La preferencia `reduceMotion` de Claude Code: sin vaiven ni chispas en reposo. */
 let reduceMotion = false
+/** El effort que el latigo puso con /effort por ultima vez (sobrevive a /clear). */
+let appliedEffort: Effort | null = null
+/** Un /effort que no se pudo correr en el momento; lo corre el sondeo. */
+let pendingEffort: Effort | null = null
 
 function today(now: number): string {
   return dayOf(now, new Date(now).getTimezoneOffset())
@@ -99,6 +103,29 @@ async function readReduceMotion($: EngineInterface): Promise<boolean> {
     return (await $.config.list()).some(row => row.key === 'reduceMotion' && row.value === true)
   } catch {
     return false
+  }
+}
+
+/**
+ * El effort con el que arranca la sesion: el guardado en ~/.claude/settings.json
+ * para el modelo (o el general). Solo para mostrarlo antes del primer pedido;
+ * turn.step trae despues el de verdad.
+ */
+async function readSavedEffort($: EngineInterface, modelName: string | null): Promise<Effort | null> {
+  const configDir = (await $.env.get('CLAUDE_CONFIG_DIR'))?.trim()
+  const home = (await $.env.get('HOME'))?.trim() || (await $.env.get('USERPROFILE'))?.trim()
+  const dir = configDir ? configDir : home ? `${home}/.claude` : null
+  if (dir === null) return null
+  try {
+    const settings = JSON.parse((await $.fs.read(`${dir}/settings.json`)) as string) as {
+      effortLevel?: unknown
+      modelSettings?: Record<string, { effortLevel?: unknown }>
+    }
+    const perModel = modelName === null ? undefined : settings.modelSettings?.[modelName]?.effortLevel
+    if (isEffort(perModel)) return perModel
+    return isEffort(settings.effortLevel) ? settings.effortLevel : null
+  } catch {
+    return null
   }
 }
 
@@ -138,8 +165,25 @@ async function setEnabled($: EngineInterface, isOn: boolean, persist = true): Pr
     animation?.cancel()
     animation = null
     await update($, lash, () => null)
-    await update($, boost, () => null)
+    await calm($)
     await writePresence($)
+  }
+}
+
+/**
+ * Cambia el effort de verdad con /effort: es el mismo que muestra el selector
+ * de modelo de Claude Code (en la terminal y en el chat de VS Code). Si no se
+ * puede, turn.step igual sube cada pedido.
+ */
+async function applyRealEffort($: EngineInterface, level: Effort): Promise<void> {
+  appliedEffort = level
+  try {
+    await $.command.run({ command: 'effort', args: level })
+  } catch {
+    // Desde adentro de otro comando (/latigazo, /latigo calma) Claude Code no
+    // deja correr /effort: lo corre el sondeo, que no depende de ese comando.
+    // Mientras tanto turn.step igual sube cada pedido.
+    pendingEffort = level
   }
 }
 
@@ -149,7 +193,18 @@ async function raiseBoost($: EngineInterface, steps: number): Promise<Effort | n
   const raised = steps === 1 ? raiseEffort(current) : raiseEffortBy(current, steps)
   if (raised === null || raised === current) return null
   await update($, boost, () => raised)
+  await applyRealEffort($, raised)
   return raised
+}
+
+/** Quita el effort forzado y, si nadie lo cambio a mano, devuelve el de antes. */
+async function calm($: EngineInterface): Promise<void> {
+  const base = await read($, effort)
+  const forced = await read($, boost)
+  await update($, boost, () => null)
+  const shouldRestore = forced !== null && base !== null && appliedEffort === forced
+  appliedEffort = null
+  if (shouldRestore && base !== null) await applyRealEffort($, base)
 }
 
 async function writePresence($: EngineInterface): Promise<void> {
@@ -181,8 +236,11 @@ async function animate($: EngineInterface, shown: Lash): Promise<void> {
   })
 }
 
-async function crack($: EngineInterface, target: Target): Promise<void> {
-  if (!(await read($, enabled))) return
+type CrackResult = { from: Effort | null; raisedTo: Effort | null; combo: number; total: number; leveledUp: boolean }
+
+async function crack($: EngineInterface, target: Target): Promise<CrackResult | null> {
+  if (!(await read($, enabled))) return null
+  const from = effectiveEffort(await read($, effort), await read($, boost))
   const now = await $.clock.now()
   combo = nextCombo(lastLashAt, combo, now)
   lastLashAt = now
@@ -217,6 +275,22 @@ async function crack($: EngineInterface, target: Target): Promise<void> {
   }
 
   await animate($, { frame: 0, target, combo: hitCombo, raisedTo, isLevelUp: leveledUp })
+  return { from, raisedTo, combo: hitCombo, total: after.total, leveledUp }
+}
+
+/** Lo que /latigazo deja escrito en el chat: el latigo y como quedo el effort. */
+function lashReport(result: CrackResult): string {
+  const look = lookFor(result.total)
+  const { tier } = progressFor(result.total)
+  const whip = `╾━━━━━━~~~~~${look.tip} ${look.crack}`
+  const effortLine =
+    result.raisedTo === null
+      ? 'El effort ya está en max: más duro no se puede.'
+      : `effort ${result.from ?? DEFAULT_EFFORT} → ${result.raisedTo} ⚡`
+  const combo = result.combo >= 2 ? ` · x${result.combo} ${comboTitle(result.combo)}` : ''
+  const level = result.leveledUp ? ` · ¡subiste a Nv ${tier.level} ${tier.name}!` : ` · Nv ${tier.level} ${tier.name}`
+  const count = result.total === 1 ? '1 latigazo' : `${result.total} latigazos`
+  return [whip, `${effortLine}${combo}${level} · ${count}`].join('\n')
 }
 
 /**
@@ -254,12 +328,20 @@ async function hydrate($: EngineInterface, isProcessStart: boolean): Promise<voi
   await update($, lash, () => null)
   const name = await $.session.model().catch(() => null)
   await update($, model, () => name || null)
+  if ((await read($, effort)) === null) {
+    const saved = await readSavedEffort($, name || null)
+    if (saved !== null) await update($, effort, () => saved)
+  }
   reduceMotion = await readReduceMotion($)
   // Registrar otra vez reemplaza al anterior: asi /latigo sigue tras un /clear.
   await $.command.register({
     name: 'latigo',
     description: 'Tabla del látigo. on | off | calma | sonido | ayuda',
     argumentHint: '[on|off|calma|sonido|ayuda]',
+  })
+  await $.command.register({
+    name: 'latigazo',
+    description: 'Latigazo al effort: lo sube un nivel (también en el selector de modelo)',
   })
   await update($, ready, () => true)
 }
@@ -268,6 +350,11 @@ async function hydrate($: EngineInterface, isProcessStart: boolean): Promise<voi
 async function poll($: EngineInterface): Promise<void> {
   // Red de seguridad: si la sesion quedo en blanco (un /clear), se vuelve a cargar.
   if (!(await read($, ready))) await hydrate($, false)
+  if (pendingEffort !== null) {
+    const level = pendingEffort
+    pendingEffort = null
+    if (appliedEffort === level) await $.command.run({ command: 'effort', args: level }).catch(() => undefined)
+  }
   if (paths === null) return
   polls += 1
 
@@ -345,6 +432,12 @@ export const register: Register = on => {
     return result
   })
 
+  on('command.run', { command: 'latigazo' }, async $ => {
+    const result = await crack($, 'effort')
+    if (result === null) return { text: 'El látigo está apagado. Préndelo con `/latigo on`.' }
+    return { text: lashReport(result) }
+  })
+
   on('command.run', { command: 'latigo' }, async ($, e) => {
     const arg = e.args.trim().toLowerCase()
     if (arg === 'on' || arg === 'encender') {
@@ -356,7 +449,7 @@ export const register: Register = on => {
       return { text: 'Látigo apagado. El effort vuelve a ser el de la sesión.' }
     }
     if (arg === 'calma') {
-      await update($, boost, () => null)
+      await calm($)
       await writePresence($)
       return { text: 'Calma: el effort vuelve a ser el de la sesión.' }
     }
@@ -376,7 +469,15 @@ export const register: Register = on => {
       return yield* next(e)
     }
     const seen = e.effort
-    if ((await read($, effort)) !== seen) await update($, effort, () => seen)
+    const forcedNow = await read($, boost)
+    if (forcedNow === null) {
+      if ((await read($, effort)) !== seen) await update($, effort, () => seen)
+    } else if (effortRank(seen) > effortRank(forcedNow)) {
+      // La persona lo subio a mano por encima del latigo: manda lo suyo.
+      await update($, effort, () => seen)
+      await update($, boost, () => null)
+      appliedEffort = null
+    }
     if ((await read($, model)) !== e.model) await update($, model, () => e.model)
 
     const forced = await read($, boost)

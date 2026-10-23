@@ -4,14 +4,24 @@
 
 ![Nivel 14, Divino: el golpe con chispas y el effort subiendo](docs/img/terminal-nivel14-golpe.png)
 
+Funciona igual en la consola y en el Claude de VS Code:
+
+| | Consola (`claude`) | Chat de Claude en VS Code |
+|---|---|---|
+| Subir el effort | Clic en la banda, o `/latigazo` | `/latigazo` en el chat, o el botón **Effort** de la barra lateral |
+| Dónde se ve el effort | Indicador `● high · /effort` | Selector "Opus 5.5 **High**" |
+| Prender y apagar | Botón `apagar` de la banda, o `/latigo off` | Interruptor de la barra lateral, `Shift+Alt+L` (`Ctrl+Cmd+L` en Mac), o `/latigo off` |
+| El látigo animado | En la banda, encima del prompt | En la barra lateral, que se abre sola al entrar al chat |
+| Tu tabla | `/latigo` | `/latigo`, o la barra lateral |
+
 Viene en dos piezas que funcionan solas o juntas:
 
 | | Plugin de Claude Code | Extensión de VS Code |
 |---|---|---|
-| Qué ves | Una banda encima del prompt | Un panel con el látigo animado en canvas y la barra de estado |
-| Sube el effort | Sí, en cada pedido al modelo | Sí, a través de la sesión de Claude Code abierta |
+| Qué ves | Una banda encima del prompt | Su ícono en la barra de la izquierda, con el látigo animado; se abre solo al entrar a una conversación de Claude |
+| Sube el effort | Sí, con `/effort`: el selector de modelo de Claude cambia | Sí, a través de la sesión de Claude Code abierta |
 | Prender y apagar | Botón `apagar`/`encender`, tecla `o`, `/latigo on\|off` | Interruptor, botón y tecla global (`Ctrl+Cmd+L` en macOS, `Shift+Alt+L` en Windows y Linux) |
-| Instalación | `/plugin install latigo --marketplace ronalc90/Visual-code-Latigo-Claude` | El `.vsix` de la [versión v0.2.0](https://github.com/ronalc90/Visual-code-Latigo-Claude/releases/tag/v0.2.0) (pronto en el Marketplace) |
+| Instalación | `/plugin install latigo --marketplace ronalc90/Visual-code-Latigo-Claude` | El `.vsix` de la [versión v0.3.0](https://github.com/ronalc90/Visual-code-Latigo-Claude/releases/tag/v0.3.0) (pronto en el Marketplace) |
 
 ---
 
@@ -49,7 +59,24 @@ Se puede hacer clic o usar el teclado. Con `ctrl+x tab` (o un clic) la banda que
 
 ## En VS Code
 
-La extensión trae el panel **Látigo**: el látigo dibujado en canvas, con chispas que caen y se apagan, destello en la punta y sacudida en los combos grandes. Al lado van el nivel con su barra, tus números, tus mejores días y el **Top global**, que por ahora aparece en gris porque llega en una próxima versión.
+El látigo tiene su ícono en la **barra de la izquierda**, junto a Explorador, Búsqueda y Extensiones. Un clic y tienes todo a la vista, sin comandos:
+
+- **El látigo animado** en canvas: chispas que caen y se apagan, destello en la punta y sacudida en los combos grandes.
+- **El interruptor grande** para prenderlo y apagarlo, y el del sonido.
+- **Los botones Modelo y Effort.** El de Effort sube el effort de tu conversación de Claude: el selector "Opus 5.5 Medium" del chat pasa a "High".
+- **Tu nivel, tus números, tus mejores días y el Top global**, que por ahora aparece en gris porque llega en una próxima versión.
+
+**Se abre solo:** al hacer clic en una conversación de Claude Code, si el látigo está prendido, aparece en la barra lateral sin quitarle el foco al chat, así sigues escribiendo. Se desactiva con el ajuste `latigo.showWithClaude`.
+
+**Dentro del chat** está `/latigazo`: lo escribes en la conversación, sube el effort y deja el látigo escrito ahí mismo.
+
+| La barra lateral | `/latigazo` en el chat |
+|---|---|
+| ![El látigo en la barra lateral de VS Code](vscode/images/screenshots/barra-lateral.png) | ![/latigazo sube el effort y deja el látigo en la conversación](docs/img/terminal-latigazo-chat.png) |
+
+**Lo que no se puede (todavía):** dibujar el látigo *adentro* del chat de Claude Code en VS Code, ni que un clic sobre el selector "Opus 5.5 Medium" lo atrape el látigo. En su versión actual, ese chat no muestra interfaz de plugins (en la terminal sí), y VS Code no deja que otra extensión escuche clics dentro de su ventana. La banda ya está programada y probada para VS Code: el día que Claude Code active esa función en el chat, aparece sola.
+
+El panel, en ancho completo:
 
 ![Panel de VS Code: nivel 9, combo x3 sobre el effort](vscode/images/screenshots/nivel-9-combo.png)
 
@@ -125,13 +152,13 @@ claude plugin install latigo --marketplace ronalc90/Visual-code-Latigo-Claude
 
 ### Extensión de VS Code
 
-Por ahora se instala con el `.vsix` de la [versión v0.2.0](https://github.com/ronalc90/Visual-code-Latigo-Claude/releases/tag/v0.2.0). Pronto estará en el Marketplace de VS Code.
+Por ahora se instala con el `.vsix` de la [versión v0.3.0](https://github.com/ronalc90/Visual-code-Latigo-Claude/releases/tag/v0.3.0). Pronto estará en el Marketplace de VS Code.
 
 Desde la consola (macOS y Linux):
 
 ```
-curl -LO https://github.com/ronalc90/Visual-code-Latigo-Claude/releases/download/v0.2.0/latigo-claude-0.2.0.vsix
-code --install-extension latigo-claude-0.2.0.vsix
+curl -LO https://github.com/ronalc90/Visual-code-Latigo-Claude/releases/download/v0.3.0/latigo-claude-0.3.0.vsix
+code --install-extension latigo-claude-0.3.0.vsix
 ```
 
 En Windows (PowerShell), lo mismo con `curl.exe` en lugar de `curl`.
@@ -148,9 +175,10 @@ La extensión también trae el comando **Látigo: Instalar el plugin en Claude C
 
 | Comando | Hace |
 |---|---|
+| `/latigazo` | Latigazo al effort desde el chat: lo sube un nivel (también en el selector de modelo) y deja el látigo escrito en la conversación |
 | `/latigo` | Tu tabla: nivel, barra de progreso, latigazos (total, hoy, al effort, al modelo), mejor combo, días con más latigazos y el Top global (próximamente) |
 | `/latigo on` · `/latigo off` | Prende o apaga el látigo (también en VS Code) |
-| `/latigo calma` | Quita el effort que forzó el látigo |
+| `/latigo calma` | Quita el effort que forzó el látigo y devuelve el que tenías |
 | `/latigo sonido` | Prende o apaga el sonido |
 | `/latigo ayuda` | Esta lista |
 
@@ -166,12 +194,12 @@ Ver la [página de la extensión](vscode/README.md#comandos).
 
 ## Cómo funciona el effort
 
-Antes de cada pedido al modelo, Claude Code les pasa a los plugins el effort con el que va a salir, y el látigo puede subirlo. Si forzaste `xhigh` y el pedido iba en `medium`, sale en `xhigh`.
+El látigo cambia el effort con el mismo comando de Claude Code, `/effort`. Por eso lo ves en todas partes: en el selector de modelo del chat de VS Code ("Opus 5.5 High"), en el indicador de la terminal (`● high · /effort`) y en la banda con ⚡. En la conversación queda la línea de `/effort` que lo aplicó.
 
-- **Nunca baja.** Si la sesión ya va en `max`, se queda en `max`.
+- **Nunca baja.** Si ya vas en `max`, se queda en `max`. Como respaldo, el plugin también sube cada pedido al modelo si el `/effort` no se pudo aplicar.
+- **`/latigo calma` y apagar el látigo devuelven el effort que tenías.** Si tú lo cambiaste a mano por encima, se respeta lo tuyo.
+- **Claude Code guarda `/effort` como predeterminado** para sesiones nuevas (salvo `max`, que es solo de la sesión). Calmar el látigo devuelve también ese predeterminado.
 - **Solo toca la conversación principal**, no los subagentes.
-- **Dura lo que dura la sesión**, o hasta `/latigo calma` o apagar el látigo.
-- **El indicador propio de Claude Code** (`◐ medium · /effort`) sigue mostrando el effort de la sesión. Lo que el látigo fuerza se ve en la banda con ⚡.
 
 Los detalles están en [docs/arquitectura.md](docs/arquitectura.md).
 
@@ -192,6 +220,9 @@ El sonido usa el reproductor de macOS. En Linux y Windows el látigo se ve pero 
 **¿Puedo ver el látigo sin tanta animación?**
 Sí. Si activas *Reduce motion* en la configuración de Claude Code, el látigo va directo al golpe y las chispas no titilan. En VS Code está el ajuste `latigo.reducedMotion`.
 
+**¿Por qué el látigo no aparece adentro del chat de Claude en VS Code?**
+Porque, en su versión actual, ese chat no muestra interfaz de plugins: solo la terminal lo hace. Por eso en VS Code el látigo vive en la barra de la izquierda y se abre solo cuando entras al chat, y adentro del chat está `/latigazo`.
+
 **¿Qué pasa si borro `~/.claude-latigo/`?**
 Nada grave. El plugin también guarda los conteos en su propio almacén y los vuelve a escribir en el próximo latigazo, así que todavía no hay forma de reiniciarlos. El interruptor vuelve a quedar encendido.
 
@@ -206,10 +237,10 @@ Sí. El plugin y la extensión buscan la misma carpeta: `LATIGO_HOME`, luego `HO
 ```
 claude --plugin-dir ./           # corre el plugin desde esta carpeta
 claude plugin validate ./        # revisa manifiesto, marketplace y hooks
-claude plugin test ./            # 91 pruebas del plugin
+claude plugin test ./            # 98 pruebas del plugin
 npx tsc -p .                     # tipos (Claude Code los deja en .claude-plugin/types/ al cargar el plugin)
-cd vscode && npm ci --include=dev && npm test   # 115 unitarias + 15 de integración de la extensión
-python scripts/e2e_puente.py --claude "$(which claude)"   # 19 de punta a punta con Claude Code real
+cd vscode && npm ci --include=dev && npm test   # 121 unitarias + 19 de integración de la extensión
+python scripts/e2e_puente.py --claude "$(which claude)"   # 22 de punta a punta con Claude Code real
 ```
 
 | Carpeta | Qué hay |

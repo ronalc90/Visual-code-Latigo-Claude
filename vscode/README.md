@@ -2,11 +2,18 @@
 
 **Un látigo para Claude Code, ahora también dentro de VS Code.** *¡Suashh… CHAS!*
 
-Abre el panel **Látigo**, dale clic al **effort** y la sesión de Claude Code que tengas abierta sube un nivel: `low → medium → high → xhigh → max`. Si le das al **modelo**, es solo para desahogarse: suena, revienta y no cambia nada. Varios seguidos hacen combo, y con cada latigazo el látigo se va dorando, poquito a poco, hasta llegar a *Divino*.
+Haz clic en el ícono del látigo en la **barra de la izquierda**, dale clic al **effort** y tu conversación de Claude Code sube un nivel: `low → medium → high → xhigh → max`. Lo ves en el selector de modelo del chat ("Opus 5.5 Medium" pasa a "High"). Al entrar a una conversación de Claude, el látigo se abre solo si está prendido. Si le das al **modelo**, es solo para desahogarse: suena, revienta y no cambia nada. Varios seguidos hacen combo, y con cada latigazo el látigo se va dorando, poquito a poco, hasta llegar a *Divino*.
 
-![El látigo de nivel 9 haciendo un combo x3 sobre el effort](images/screenshots/nivel-9-combo.png)
+| En la barra lateral | En ancho completo |
+|---|---|
+| ![El látigo en la barra lateral](images/screenshots/barra-lateral.png) | ![El látigo de nivel 9 haciendo un combo x3 sobre el effort](images/screenshots/nivel-9-combo.png) |
 
 ## Lo que trae
+
+- **Ícono en la barra de la izquierda.** Un clic y está todo a la vista: el látigo, el interruptor de prender y apagar, y los botones Modelo y Effort. Sin comandos.
+- **Se abre solo al entrar al chat de Claude Code** (si el látigo está prendido) y no le quita el foco a la conversación. Se apaga con el ajuste `latigo.showWithClaude`.
+- **Sube el effort de verdad:** usa el mismo `/effort` de Claude Code, así que el selector de modelo del chat muestra el nuevo nivel.
+- **`/latigazo` dentro del chat:** escríbelo en la conversación y sube el effort ahí mismo, dejando el látigo escrito.
 
 - **Un látigo de verdad animado.** Curva suave con mango y trenzado, amague, golpe y rebote; destello y onda expansiva en la punta; chispas con gravedad que caen y se apagan. En los combos grandes el escenario se sacude.
 - **Dos objetivos.** *Modelo* (solo visual) y *Effort* (lo sube en la sesión abierta de Claude Code; el ⚡ indica que el látigo lo está forzando).
@@ -62,7 +69,7 @@ Todos están en la paleta (`Cmd+Shift+P` / `Ctrl+Shift+P`), en la categoría **L
 
 | Comando | Qué hace |
 |---|---|
-| Látigo: Abrir el panel | Abre el panel del látigo en el área inferior |
+| Látigo: Abrir el panel | Abre el látigo en la barra lateral |
 | Látigo: Encender/Apagar | Prende o apaga el látigo (aquí y en Claude Code) |
 | Látigo: Latigazo al effort | Da un latigazo al effort sin abrir el panel |
 | Látigo: Latigazo al modelo | Da un latigazo al modelo (solo visual) |
@@ -74,6 +81,7 @@ Todos están en la paleta (`Cmd+Shift+P` / `Ctrl+Shift+P`), en la categoría **L
 
 | Ajuste | Valor por defecto | Para qué |
 |---|---|---|
+| `latigo.showWithClaude` | `true` | Al entrar a una conversación de Claude Code, abre el látigo en la barra lateral (si está prendido), sin quitarle el foco al chat |
 | `latigo.showStatusBar` | `true` | Muestra el nivel en la barra de estado |
 | `latigo.reducedMotion` | `"auto"` | `auto` sigue al sistema; `on` siempre reduce el movimiento; `off` siempre anima todo |
 | `latigo.volume` | `0.7` | Volumen del latigazo y de la subida de nivel, de `0` a `1` |
@@ -105,6 +113,9 @@ Revisa el interruptor **Sonido** del panel y el ajuste `latigo.volume`. El sonid
 
 **¿Puedo reiniciar mis números?**
 Todavía no. Los conteos solo crecen, y el plugin de Claude Code guarda su propia copia: si borras `~/.claude-latigo/stats.json`, la vuelve a escribir. Reiniciarlos está en la lista para una próxima versión.
+
+**¿Por qué el látigo no se dibuja adentro del chat de Claude?**
+Porque, en su versión actual, el chat de Claude Code en VS Code no muestra interfaz de plugins (la consola sí), y VS Code no deja que otra extensión dibuje o escuche clics dentro de otra ventana. Por eso el látigo vive en la barra lateral y se abre solo cuando entras al chat, y adentro del chat está `/latigazo`.
 
 **¿Y el Top global?**
 Viene en una próxima versión: un ranking opcional, con apodo, entre todos los que usan el látigo. Por ahora la sección se ve pero está deshabilitada.

@@ -28,12 +28,14 @@ type World = {
   sounds: string[]
   toasts: string[]
   commands: string[]
+  /** Lo que el plugin pidio con /effort. */
+  efforts: string[]
   clock: ReturnType<typeof mock.clock>
 }
 
 /** Arma el mundo de mentira bajo el mod. */
 function world(on: On, files: Record<string, string> = {}, store: Record<string, unknown> = {}, reduceMotion = false, env: Record<string, string> = { HOME }): World {
-  const state: World = { files: new Map(Object.entries(files)), sounds: [], toasts: [], commands: [], clock: mock.clock(on, { now: Date.UTC(2026, 9, 22, 15, 0) }) }
+  const state: World = { files: new Map(Object.entries(files)), sounds: [], toasts: [], commands: [], efforts: [], clock: mock.clock(on, { now: Date.UTC(2026, 9, 22, 15, 0) }) }
   mock.store(on, store)
   mock.env(on, env)
   on('fs.read', ($, e) => {
@@ -59,6 +61,10 @@ function world(on: On, files: Record<string, string> = {}, store: Record<string,
     return { value: undefined }
   })
   on('config.list', () => ({ value: reduceMotion ? [{ key: 'reduceMotion', label: 'Reduce motion', kind: 'boolean', value: true, provider: { plugin: 'engine', tier: 'core' }, isLocked: false }] : [] }))
+  on('command.run', { command: 'effort' }, ($, e) => {
+    state.efforts.push(e.args)
+    return { text: `Set effort level to ${e.args}` }
+  })
   on('session.start', () => ({ cwd: '/proyecto' }))
   on('session.end', ($, e) => ({ sessionId: e.sessionId }))
   return state
@@ -456,10 +462,96 @@ describe('lo que encontro la revision', () => {
   test('/latigo se vuelve a registrar tras un /clear', async ($, on) => {
     const w = world(on)
     await start($)
-    expect(w.commands).toEqual(['latigo'])
+    expect(w.commands).toEqual(['latigo', 'latigazo'])
     await $.session.end({ reason: 'clear', sessionId: 's1', resume: { id: 's1' } })
     await w.clock.advance(10)
-    expect(w.commands).toEqual(['latigo', 'latigo'])
+    expect(w.commands).toEqual(['latigo', 'latigazo', 'latigo', 'latigazo'])
+  })
+})
+
+describe('effort de verdad con /effort', () => {
+  const SETTINGS = `${HOME}/.claude/settings.json`
+  const saved = (effort: string) => JSON.stringify({ modelSettings: { 'claude-opus-5-5': { effortLevel: effort } } })
+
+  test('al arrancar muestra el effort guardado para el modelo', async ($, on) => {
+    world(on, { [SETTINGS]: saved('medium') })
+    await start($)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await ui.find({ key: 'effort' })).toMatchObject({ props: { label: 'effort: medium' } })
+    await ui.unmount()
+  })
+
+  test('el latigazo al effort lo cambia con /effort (lo que muestra el selector de modelo)', async ($, on) => {
+    const w = world(on, { [SETTINGS]: saved('medium') })
+    await start($)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await ui.press({ key: 'effort' })
+    await w.clock.advance(200)
+    await ui.press({ key: 'effort' })
+    expect(w.efforts).toEqual(['high', 'xhigh'])
+    await w.clock.advance(2000)
+    expect(await ui.find({ key: 'effort' })).toMatchObject({ props: { label: 'effort: xhigh ⚡' } })
+    await ui.unmount()
+  })
+
+  test('calma devuelve el effort que habia antes del latigo', async ($, on) => {
+    const w = world(on, { [SETTINGS]: saved('medium') })
+    await start($)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await ui.press({ key: 'effort' })
+    await $.command.run({ command: 'latigo', args: 'calma', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } })
+    await w.clock.advance(2000)
+    expect(w.efforts).toEqual(['high', 'medium'])
+    expect(await ui.find({ key: 'effort' })).toMatchObject({ props: { label: 'effort: medium' } })
+    await ui.unmount()
+  })
+
+  test('apagar tambien devuelve el effort de antes', async ($, on) => {
+    const w = world(on, { [SETTINGS]: saved('high') })
+    await start($)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await ui.press({ key: 'effort' })
+    await ui.press({ key: 'toggle' })
+    expect(w.efforts).toEqual(['xhigh', 'high'])
+    await ui.unmount()
+  })
+
+  test('si la persona sube el effort a mano por encima, manda lo suyo y no se le devuelve nada', async ($, on) => {
+    const w = world(on, { [SETTINGS]: saved('medium') })
+    on('turn.step', async function* ($, e) {
+      return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn', usage: null }
+    })
+    await start($)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await ui.press({ key: 'effort' })
+    const stream = $.turn.step({ turnId: 't1', index: 0, model: 'claude-opus-5-5', effort: 'max', messageCount: 1 })
+    for await (const _chunk of stream) {
+      // se consume
+    }
+    await $.command.run({ command: 'latigo', args: 'calma', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } })
+    await w.clock.advance(700)
+    expect(w.efforts).toEqual(['high'])
+    await ui.unmount()
+  })
+
+  test('/latigazo en el chat sube el effort y deja el latigo escrito', async ($, on) => {
+    const w = world(on, { [SETTINGS]: saved('medium') })
+    await start($)
+    const result = (await $.command.run({ command: 'latigazo', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } })) as { text: string }
+    await w.clock.advance(700)
+    expect(w.efforts).toEqual(['high'])
+    expect(result.text).toContain('╾━━━━━━~~~~~')
+    expect(result.text).toContain('effort medium → high ⚡')
+    expect(result.text).toContain('Nv 1 Cuero crudo · 1 latigazo')
+    expect(result.text).not.toContain('```')
+    expect(json(w, 'stats.json')).toMatchObject({ stats: { total: 1, onEffort: 1 } })
+  })
+
+  test('/latigazo con el latigo apagado lo dice', async ($, on) => {
+    world(on, { [`${DIR}/config.json`]: '{"version":1,"enabled":false,"sound":true}' })
+    await start($)
+    const result = (await $.command.run({ command: 'latigazo', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } })) as { text: string }
+    expect(result.text).toContain('apagado')
   })
 })
 

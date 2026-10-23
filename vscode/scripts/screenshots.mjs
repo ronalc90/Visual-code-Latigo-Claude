@@ -112,6 +112,7 @@ function lashed(base, id, target, combo, comboTitle, levelUp = false) {
 
 const nivel5 = { total: 247, onEffort: 171, bestCombo: 6, days: [41, 37, 30, 22, 18], today: 40, session: { ...opus, effort: 'medium', boost: 'high' } }
 const nivel9 = { total: 1412, onEffort: 1003, bestCombo: 14, days: [133, 120, 96, 88, 71], today: 93, session: { ...opus, effort: 'high', boost: 'xhigh' } }
+const nivel9b = { ...nivel9, days: [...nivel9.days] }
 const nivel14 = { total: 6999, onEffort: 5120, bestCombo: 23, days: [402, 377, 351, 340, 298], today: 350, session: { ...opus, effort: 'xhigh', boost: 'max' } }
 
 // Cada escena: estado, latigazos y cuanto avanzar el reloj despues de cada uno.
@@ -150,6 +151,18 @@ const scenes = [
     steps: [{ advance: 1200 }, { message: lashed(nivel14, 'c1', 'effort', 1, '', true), advance: 330 }],
   },
   {
+    file: 'barra-lateral.png',
+    seed: 29,
+    size: [340, 1040],
+    state: viewState({ ...nivel9b }),
+    steps: [
+      { advance: 300 },
+      { message: lashed(nivel9b, 'd1', 'effort', 1, ''), advance: 300 },
+      { message: lashed(nivel9b, 'd2', 'effort', 2, '¡DOBLE!'), advance: 300 },
+      { message: lashed(nivel9b, 'd3', 'effort', 3, '¡TRIPLE!'), advance: 265 },
+    ],
+  },
+  {
     file: 'sin-sesion.png',
     seed: 5,
     size: [1280, 480],
@@ -164,6 +177,14 @@ const scenes = [
     steps: [{ advance: 100 }],
   },
 ]
+
+const MIN_WINDOW_WIDTH = 500
+
+/** Recorta un PNG a `pixels` de ancho, centrado, que es donde va el marco (sips, de macOS). */
+function cropWidth(file, pixels) {
+  const height = Number(/pixelHeight: (\d+)/.exec(execFileSync('sips', ['-g', 'pixelHeight', file], { encoding: 'utf8' }))?.[1])
+  execFileSync('sips', ['-c', String(height), String(pixels), file], { stdio: 'pipe' })
+}
 
 for (const scene of scenes) {
   const name = scene.file.replace(/\.png$/, '')
@@ -194,7 +215,19 @@ for (const scene of scenes) {
   writeFileSync(page, html)
 
   const out = join(target, scene.file)
-  const url = `${pathToFileURL(page).href}?demo=1&seed=${scene.seed}`
+  let url = `${pathToFileURL(page).href}?demo=1&seed=${scene.seed}`
+  // Chrome sin interfaz no baja de 500 px de ancho: una escena mas angosta (la
+  // barra lateral) se arma dentro de un marco de su ancho real y luego se recorta.
+  const [width, height] = scene.size
+  const narrow = width < MIN_WINDOW_WIDTH
+  if (narrow) {
+    const frame = join(work, `${name}.frame.html`)
+    writeFileSync(
+      frame,
+      `<!doctype html><html><body style="margin:0;background:#181818;display:flex;justify-content:center"><iframe src="${pathToFileURL(page).href}?demo=1&seed=${scene.seed}" style="display:block;border:0;width:${width}px;height:${height}px"></iframe></body></html>`,
+    )
+    url = pathToFileURL(frame).href
+  }
   execFileSync(
     chrome,
     [
@@ -204,12 +237,13 @@ for (const scene of scenes) {
       '--allow-file-access-from-files',
       '--force-device-scale-factor=2',
       '--force-prefers-reduced-motion=0',
-      `--window-size=${scene.size[0]},${scene.size[1]}`,
+      `--window-size=${Math.max(width, MIN_WINDOW_WIDTH)},${height}`,
       `--screenshot=${out}`,
       '--virtual-time-budget=2000',
       url,
     ],
     { stdio: 'pipe' },
   )
+  if (narrow) cropWidth(out, width * 2)
   console.log(`listo ${out}`)
 }

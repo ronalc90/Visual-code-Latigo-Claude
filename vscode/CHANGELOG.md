@@ -2,6 +2,14 @@
 
 Todos los cambios importantes de la extensión **Látigo para Claude Code**.
 
+## [0.3.0] - 2026-10-22
+
+### Agregado
+
+- **Ícono en la barra de actividad de la izquierda:** el látigo, el interruptor y los botones a un clic. El panel se acomoda al ancho de la barra lateral.
+- **Se abre solo al entrar a una conversación de Claude Code** (si el látigo está prendido), sin quitarle el foco al chat. Ajuste `latigo.showWithClaude`.
+- **El botón Effort sube el effort de verdad:** el selector de modelo del chat de Claude muestra el nuevo nivel (lo aplica el plugin con `/effort`).
+
 ## [0.2.0] - 2026-10-22
 
 Primera versión para VS Code.

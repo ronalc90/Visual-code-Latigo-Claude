@@ -8,6 +8,7 @@ import type { BridgeSnapshot } from './bridgeState'
 import { BridgeState } from './bridgeState'
 import { BridgeStore } from './bridgeStore'
 import { BridgeWatcher } from './bridgeWatcher'
+import { ClaudeFocusWatcher } from './claudeFocusWatcher'
 import { systemClock } from './clock'
 import { VIEW_ID } from './commandIds'
 import { registerCommands } from './commands'
@@ -27,6 +28,8 @@ export type LatigoApi = {
   snapshot(): BridgeSnapshot
   /** True cuando el webview del panel cargo y hablo con la extension. */
   panelReady(): boolean
+  /** True cuando el panel del latigo esta a la vista. */
+  panelVisible(): boolean
 }
 
 
@@ -43,7 +46,9 @@ export function activate(context: vscode.ExtensionContext): LatigoApi {
   // Lo ultimo conocido de los conteos protege contra un stats.json a medio escribir.
   const lashes = new LashService(store, clock, undefined, () => state.snapshot.stats)
   const statusBar = new LatigoStatusBar()
+  const claudeFocus = new ClaudeFocusWatcher()
   const controller = new LatigoController({
+    isClaudeActive: () => claudeFocus.isClaudeActive,
     store,
     state,
     lashes,
@@ -56,6 +61,8 @@ export function activate(context: vscode.ExtensionContext): LatigoApi {
 
   const watcher = new BridgeWatcher(store.paths, file => state.refresh(file))
   watcher.start()
+  context.subscriptions.push(claudeFocus, claudeFocus.onDidEnterClaude(() => controller.onClaudeFocused()))
+  claudeFocus.start()
   const presenceTimer = setInterval(() => state.refresh('presence'), PRESENCE_CHECK_MS)
 
   context.subscriptions.push(
@@ -80,6 +87,7 @@ export function activate(context: vscode.ExtensionContext): LatigoApi {
     statusBarText: () => statusBar.text,
     snapshot: () => state.snapshot,
     panelReady: () => panel.isReady,
+    panelVisible: () => panel.isVisible,
   }
 }
 

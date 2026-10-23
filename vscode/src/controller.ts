@@ -19,6 +19,8 @@ import type { LatigoStatusBar } from './statusBar'
 import { buildViewState } from './viewState'
 
 export type ControllerDeps = {
+  /** True si la pestaña activa es una conversacion de Claude Code. */
+  isClaudeActive: () => boolean
   store: BridgeStore
   state: BridgeState
   lashes: LashService
@@ -110,6 +112,13 @@ export class LatigoController implements PanelHost, vscode.Disposable {
     }
   }
 
+  /** La persona entro a una conversacion de Claude Code: si el latigo esta prendido, se muestra. */
+  onClaudeFocused(): void {
+    if (!this.settings.showWithClaude) return
+    if (!this.deps.store.readConfig().enabled) return
+    void this.panel?.reveal()
+  }
+
   async open(): Promise<void> {
     await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
   }
@@ -122,6 +131,8 @@ export class LatigoController implements PanelHost, vscode.Disposable {
     const config = this.saveConfig({ enabled })
     if (config === null) return this.deps.store.readConfig().enabled
     if (options.announce) void vscode.window.showInformationMessage(config.enabled ? 'Látigo encendido' : 'Látigo apagado')
+    // Prenderlo estando en una conversacion de Claude lo muestra de una vez.
+    if (config.enabled && this.deps.isClaudeActive()) this.onClaudeFocused()
     return config.enabled
   }
 

@@ -71,15 +71,20 @@ def run(claude: str) -> None:
         session.pump(1.0)
 
         check("toma los conteos que ya estaban en disco", "10 latigazos" in band(session), band(session))
-        check("los 4 latigazos al effort de antes no se aplican", "effort:" not in band(session), band(session))
+        check("los 4 latigazos al effort de antes no se aplican", "⚡" not in band(session), band(session))
 
         presence_ok = wait_until(session, lambda: read("presence.json").get("model"), 6)
         check("Claude Code avisa que esta vivo (presence.json)", presence_ok, str(read("presence.json")))
+
+        def footer() -> str:
+            return next((line for line in reversed(session.screen.display) if "/effort" in line), "")
 
         # VS Code: latigazo al effort.
         write("effort.json", {"seq": 5, "at": int(time.time() * 1000)})
         ok = wait_until(session, lambda: "effort: high ⚡" in band(session))
         check("un latigazo al effort desde VS Code sube el effort en Claude Code", ok, band(session))
+        ok = wait_until(session, lambda: "high · /effort" in footer(), 4)
+        check("y cambia el effort de verdad (el del selector de modelo)", ok, footer())
         ok = wait_until(session, lambda: read("presence.json").get("boost") == "high")
         check("la presencia le cuenta a VS Code el effort forzado", ok, str(read("presence.json")))
 
@@ -104,6 +109,26 @@ def run(claude: str) -> None:
         ok = wait_until(session, lambda: "[ apagar ]" in band(session) or "apagar" in band(session))
         check("prender desde VS Code la vuelve a mostrar", ok, band(session))
 
+        # Calma: el effort vuelve al de antes del latigo.
+        session.send(b"/latigo calma")
+        session.pump(0.5)
+        session.send(b"\r")
+        ok = wait_until(session, lambda: "medium · /effort" in footer() and "⚡" not in band(session), 6)
+        check("/latigo calma devuelve el effort de antes", ok, footer() + " | " + band(session))
+
+        # /latigazo dentro del chat: sube el effort y deja el latigo escrito.
+        session.send(b"/latigazo")
+        session.pump(0.5)
+        session.send(b"\r")
+        ok = wait_until(session, lambda: "effort medium → high" in session.text() and "high · /effort" in footer(), 6)
+        check("/latigazo en el chat sube el effort y lo cuenta en la conversacion", ok, footer())
+        session.send(b"/latigo calma")
+        session.pump(0.5)
+        session.send(b"\r")
+        wait_until(session, lambda: "medium · /effort" in footer(), 6)
+        # El /effort pendiente lo corre el plugin; se espera a que termine antes de usar la banda.
+        session.pump(1.5)
+
         # Claude Code: latigazo en la banda llega a disco para VS Code.
         session.send(b"\x18\t")
         session.pump(0.4)
@@ -111,7 +136,7 @@ def run(claude: str) -> None:
         ok = wait_until(session, lambda: read("lash.json").get("source") == "terminal")
         check("un latigazo en Claude Code queda en lash.json para VS Code", ok, str(read("lash.json")))
         stats = read("stats.json").get("stats", {})
-        check("y suma en stats.json", stats.get("total") == 14 and stats.get("onModel") == 7, str(stats))
+        check("y suma en stats.json", stats.get("total") == 15 and stats.get("onModel") == 7, str(stats))
 
         # Claude Code: /latigo off llega a config.json.
         session.send(b"\x1b")
@@ -131,7 +156,7 @@ def run(claude: str) -> None:
         session.send(b"/clear")
         session.pump(0.5)
         session.send(b"\r")
-        ok = wait_until(session, lambda: "14 latigazos" in band(session), 4)
+        ok = wait_until(session, lambda: "15 latigazos" in band(session), 4)
         check("tras /clear la banda conserva los conteos", ok, band(session))
         session.send(b"/latigo ayuda")
         session.pump(0.5)

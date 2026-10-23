@@ -1,14 +1,14 @@
 # Pruebas
 
-Son cuatro capas, de la regla más chica al programa real funcionando. Todas pasan en la versión 0.2.0.
+Son cuatro capas, de la regla más chica al programa real funcionando. Todas pasan en la versión 0.3.0.
 
 | Capa | Dónde | Cuántas | Cómo se corre |
 |---|---|---:|---|
 | Reglas compartidas y banda | `tests/rules.test.ts` | 42 | `claude plugin test ./` |
-| Plugin de Claude Code | `tests/mod.test.tsx` | 49 | `claude plugin test ./` |
-| Extensión, unitarias | `vscode/test/unit/` | 115 | `cd vscode && npm run test:unit` |
-| Extensión, integración (VS Code real) | `vscode/test/integration/` | 15 | `cd vscode && npm run test:integration` |
-| Punta a punta con Claude Code real | `scripts/e2e_puente.py` | 19 | `python scripts/e2e_puente.py --claude "$(which claude)"` |
+| Plugin de Claude Code | `tests/mod.test.tsx` | 56 | `claude plugin test ./` |
+| Extensión, unitarias | `vscode/test/unit/` | 121 | `cd vscode && npm run test:unit` |
+| Extensión, integración (VS Code real) | `vscode/test/integration/` | 19 | `cd vscode && npm run test:integration` |
+| Punta a punta con Claude Code real | `scripts/e2e_puente.py` | 22 | `python scripts/e2e_puente.py --claude "$(which claude)"` |
 
 Además, `claude plugin validate ./` revisa el manifiesto, el marketplace y los hooks, y los dos lados pasan la revisión de tipos de TypeScript en modo estricto.
 
@@ -86,7 +86,7 @@ Corre el plugin dentro del motor de pruebas de Claude Code, con el disco, el rel
 
 Las detalla [la extensión](../vscode/README.md).
 
-- **Unitarias (115):**
+- **Unitarias (121):**
   - Lectura y escritura atómica del puente, incluidos 9 tipos de JSON roto y escrituras concurrentes.
   - El servicio de latigazos: combos, `seq` de effort, día local, fusión con la terminal, subida de nivel, apagado y sonido.
   - Vigilancia de archivos, formato de la barra de estado y el protocolo del webview (18 mensajes inválidos rechazados).
@@ -94,12 +94,13 @@ Las detalla [la extensión](../vscode/README.md).
   - La carpeta del puente con la misma regla que el plugin.
   - El renombrado que reintenta cuando Windows tiene el archivo ocupado.
   - Un `stats.json` ilegible no baja los conteos.
-- **Integración (15):** corre la extensión dentro de un VS Code real, con carpetas temporales.
+- **Integración (19):** corre la extensión dentro de un VS Code real, con carpetas temporales.
   - Activa la extensión y registra los comandos.
   - Declara el atajo y verifica que no choca con los de fábrica.
   - El interruptor, el sonido y los latigazos al effort, con sesión y sin ella.
   - La barra de estado y los cambios hechos desde afuera.
   - El panel con su CSP y la terminal de instalación.
+  - Al entrar a una conversación de Claude Code, el látigo aparece en la barra lateral sin quitarle el foco; no aparece si está apagado o con `latigo.showWithClaude` en falso; prenderlo estando en el chat lo muestra.
 
 ## Punta a punta con Claude Code real (`scripts/e2e_puente.py`)
 
@@ -115,6 +116,10 @@ Abre `claude` de verdad en una terminal virtual, con el plugin cargado desde la 
 8. `/latigo off` y `/latigo on` llegan a VS Code.
 9. Después de `/clear`, la banda conserva los conteos, `/latigo` sigue disponible y un látigo apagado sigue apagado.
 10. Al cerrar Claude Code, la presencia queda vencida enseguida para VS Code.
+11. El latigazo al effort cambia el effort de verdad (el indicador de Claude Code pasa a `high`).
+12. `/latigo calma` lo devuelve, y `/latigazo` en el chat lo sube y lo cuenta en la conversación.
+
+Como el látigo usa `/effort`, que Claude Code guarda en `~/.claude/settings.json`, los scripts respaldan ese archivo y lo devuelven tal cual al terminar (y antes de cada escena de las capturas).
 
 El script no toca tus datos:
 

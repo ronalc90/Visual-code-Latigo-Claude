@@ -2,7 +2,7 @@
   "name": "latigo-claude",
   "displayName": "Látigo para Claude Code",
   "description": "Un látigo para Claude Code dentro de VS Code: latigazos animados con sonido, combos, niveles que se van dorando y un clic al effort para subirlo.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "ronalc90",
   "author": {
     "name": "Ronald Cipagauta",
@@ -119,7 +119,7 @@
       }
     ],
     "viewsContainers": {
-      "panel": [
+      "activitybar": [
         {
           "id": "latigo",
           "title": "Látigo",
@@ -188,6 +188,12 @@
     "configuration": {
       "title": "Látigo",
       "properties": {
+        "latigo.showWithClaude": {
+          "type": "boolean",
+          "default": true,
+          "order": 0,
+          "markdownDescription": "Al entrar a una conversación de Claude Code, muestra el panel del látigo debajo (solo si el látigo está prendido). No le quita el foco a la conversación."
+        },
         "latigo.showStatusBar": {
           "type": "boolean",
           "default": true,

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 
+import { VIEW_ID } from '../commandIds'
 import type { HostMessage, LashAnimation, ViewState, WebviewMessage } from '../protocol'
 import { parseWebviewMessage } from '../protocol'
 import { createNonce, renderPanelHtml } from './html'
@@ -10,7 +11,7 @@ export interface PanelHost {
   handleMessage(message: WebviewMessage): void
 }
 
-/** El panel "Látigo" del area inferior. Solo pinta y reenvia mensajes validados. */
+/** El panel "Látigo" de la barra lateral. Solo pinta y reenvia mensajes validados. */
 export class LatigoViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   private view: vscode.WebviewView | undefined
   private ready = false
@@ -51,6 +52,25 @@ export class LatigoViewProvider implements vscode.WebviewViewProvider, vscode.Di
         this.ready = false
       }),
     )
+  }
+
+  /**
+   * Muestra el panel sin quitarle el foco a lo que la persona tiene activo (la
+   * conversacion de Claude Code), asi puede seguir escribiendo.
+   */
+  async reveal(): Promise<void> {
+    if (this.view !== undefined) {
+      if (!this.view.visible) this.view.show(true)
+      return
+    }
+    // Nunca se abrio: abrirlo lo enfoca, y luego se le devuelve el foco al editor.
+    await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
+    await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup')
+  }
+
+  /** El panel esta a la vista. */
+  get isVisible(): boolean {
+    return this.view !== undefined && this.view.visible
   }
 
   /** El webview cargo su script y pidio el estado. */
