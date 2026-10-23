@@ -11,7 +11,7 @@ Viene en dos piezas que funcionan solas o juntas:
 | Qué ves | Una banda encima del prompt | Un panel con el látigo animado en canvas y la barra de estado |
 | Sube el effort | Sí, en cada pedido al modelo | Sí, a través de la sesión de Claude Code abierta |
 | Prender y apagar | Botón `apagar`/`encender`, tecla `o`, `/latigo on\|off` | Interruptor, botón y tecla global (`Ctrl+Cmd+L` en macOS, `Shift+Alt+L` en Windows y Linux) |
-| Instalación | `/plugin install latigo --marketplace ronalc90/Visual-code-Latigo-Claude` | Marketplace de VS Code: **Látigo para Claude Code** (o el `.vsix`) |
+| Instalación | `/plugin install latigo --marketplace ronalc90/Visual-code-Latigo-Claude` | El `.vsix` de la [versión v0.2.0](https://github.com/ronalc90/Visual-code-Latigo-Claude/releases/tag/v0.2.0) (pronto en el Marketplace) |
 
 ---
 
@@ -125,11 +125,20 @@ claude plugin install latigo --marketplace ronalc90/Visual-code-Latigo-Claude
 
 ### Extensión de VS Code
 
-Busca **Látigo para Claude Code** en el panel de extensiones, o instala el `.vsix` de la página de versiones:
+Por ahora se instala con el `.vsix` de la [versión v0.2.0](https://github.com/ronalc90/Visual-code-Latigo-Claude/releases/tag/v0.2.0). Pronto estará en el Marketplace de VS Code.
+
+Desde la consola (macOS y Linux):
 
 ```
+curl -LO https://github.com/ronalc90/Visual-code-Latigo-Claude/releases/download/v0.2.0/latigo-claude-0.2.0.vsix
 code --install-extension latigo-claude-0.2.0.vsix
 ```
+
+En Windows (PowerShell), lo mismo con `curl.exe` en lugar de `curl`.
+
+Sin consola, descarga el `.vsix` de la versión y en VS Code ve a **Extensiones** → menú **…** → **Instalar desde VSIX…**.
+
+Si la consola no reconoce `code` en macOS, en VS Code abre la paleta (`Cmd+Shift+P`) y corre **Shell Command: Install 'code' command in PATH**.
 
 La extensión también trae el comando **Látigo: Instalar el plugin en Claude Code**, que abre una terminal con el comando listo.
 
