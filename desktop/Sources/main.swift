@@ -213,14 +213,19 @@ func diagnose() {
     print("Látigo \(version) · diagnóstico")
     let others = NSRunningApplication.runningApplications(withBundleIdentifier: "com.ronalc90.latigo").filter { $0 != .current }
     if others.isEmpty {
-        print("Otra copia abierta: no")
+        print("App abierta: no")
     } else {
-        for other in others { print("Otra copia abierta: sí · pid \(other.processIdentifier) · \(other.bundleURL?.path ?? "?")") }
+        for other in others { print("App abierta: sí · pid \(other.processIdentifier) · \(other.bundleURL?.path ?? "?")") }
     }
     let hotkey = HotKey(keyCode: HotKey.keyL, modifiers: HotKey.controlCommand, id: 9) {}
-    // macOS solo deja saber si otra app lo tiene en exclusiva; las demas no se ven.
-    print(hotkey.status == .ok ? "Atajo ⌃⌘L: se puede registrar" : "Atajo ⌃⌘L: otra app lo tiene en exclusiva (ciérrala o usa el menú del látigo)")
     hotkey.unregister()
+    // macOS solo deja saber si alguien lo tiene en exclusiva: si la app esta abierta, deberia ser ella.
+    switch (hotkey.status, others.isEmpty) {
+    case (.ocupado, false): print("Atajo ⌃⌘L: lo tiene el Látigo abierto (bien)")
+    case (.ocupado, true): print("Atajo ⌃⌘L: otra app lo tiene en exclusiva (ciérrala o usa el menú del látigo)")
+    case (.ok, false): print("Atajo ⌃⌘L: el Látigo abierto no lo tiene (ciérralo y vuelve a abrirlo)")
+    case (.ok, true): print("Atajo ⌃⌘L: libre (abre la app para usarlo)")
+    }
     let sounds = loadSounds()
     let bridge = Bridge(files: .standard(), soundStyles: Set(sounds.styles.map(\.id)), defaultSoundStyle: sounds.defaultId)
     let config = bridge.readConfig()
