@@ -1,5 +1,6 @@
 import * as assert from 'node:assert/strict'
 
+import { SOUND_STYLES } from '../../../hooks/sounds'
 import { parseWebviewMessage } from '../../src/protocol'
 
 describe('parseWebviewMessage', () => {
@@ -9,8 +10,8 @@ describe('parseWebviewMessage', () => {
     assert.deepEqual(parseWebviewMessage({ type: 'lash', target: 'model' }), { type: 'lash', target: 'model' })
     assert.deepEqual(parseWebviewMessage({ type: 'setEnabled', enabled: false }), { type: 'setEnabled', enabled: false })
     assert.deepEqual(parseWebviewMessage({ type: 'setSound', sound: true }), { type: 'setSound', sound: true })
+    assert.deepEqual(parseWebviewMessage({ type: 'setSoundStyle', style: 'real-4' }), { type: 'setSoundStyle', style: 'real-4' })
     assert.deepEqual(parseWebviewMessage({ type: 'installPlugin' }), { type: 'installPlugin' })
-    assert.deepEqual(parseWebviewMessage({ type: 'toggleWhipMode' }), { type: 'toggleWhipMode' })
     assert.deepEqual(parseWebviewMessage({ type: 'openDesktopApp' }), { type: 'openDesktopApp' })
     assert.deepEqual(parseWebviewMessage({ type: 'openInstallGuide' }), { type: 'openInstallGuide' })
   })
@@ -33,12 +34,22 @@ describe('parseWebviewMessage', () => {
     ['setSound con numero', { type: 'setSound', sound: 1 }],
     ['ready con carga', { type: 'ready', path: '/etc/passwd' }],
     ['installPlugin con comando', { type: 'installPlugin', command: 'rm -rf /' }],
-    ['toggleWhipMode con estado', { type: 'toggleWhipMode', active: true }],
+    ['el modo latigo aparte, que ya no existe', { type: 'toggleWhipMode' }],
+    ['setSoundStyle sin estilo', { type: 'setSoundStyle' }],
+    ['setSoundStyle con un estilo que no existe', { type: 'setSoundStyle', style: 'tambor' }],
+    ['setSoundStyle con una ruta de archivo', { type: 'setSoundStyle', style: '../../etc/passwd' }],
+    ['setSoundStyle con numero', { type: 'setSoundStyle', style: 4 }],
+    ['setSoundStyle con campos de mas', { type: 'setSoundStyle', style: 'real', sound: false }],
     ['openDesktopApp con otra app', { type: 'openDesktopApp', app: 'Terminal' }],
     ['openInstallGuide con url', { type: 'openInstallGuide', url: 'https://example.com' }],
-    ['toggleWhipMode con mayusculas', { type: 'ToggleWhipMode' }],
     ['prototipo envenenado', JSON.parse('{"type":"ready","__proto__":{"x":1}}') as unknown],
   ]
+
+  it('acepta los nueve estilos de sonido, uno por uno', () => {
+    for (const style of SOUND_STYLES) {
+      assert.deepEqual(parseWebviewMessage({ type: 'setSoundStyle', style: style.id }), { type: 'setSoundStyle', style: style.id })
+    }
+  })
 
   for (const [name, value] of rejected) {
     it(`rechaza ${name}`, () => {

@@ -52,6 +52,10 @@ writeFileSync(
   --vscode-editorWarning-foreground: #cca700;
   --vscode-notifications-background: #1f1f1f;
   --vscode-notifications-foreground: #cccccc;
+  --vscode-dropdown-background: #313131;
+  --vscode-dropdown-border: #3c3c3c;
+  --vscode-dropdown-foreground: #cccccc;
+  --vscode-dropdown-listBackground: #1f1f1f;
 }
 `,
 )
@@ -84,13 +88,15 @@ function topOf(s) {
     .slice(0, 5)
 }
 
-const desktopApp = (alive, whipMode, appMissing = false) => ({ supported: true, alive, whipMode, appMissing })
+/** La app de escritorio en Mac, como la ve el panel. */
+const desktopApp = (alive, whipMode, { appMissing = false, hotkey = 'ok' } = {}) => ({ supported: true, alive, whipMode, hotkey, appMissing })
 
-function viewState({ enabled = true, sound = true, total, onEffort, bestCombo, days, today, session, desktop = desktopApp(true, false) }) {
+function viewState({ enabled = true, sound = true, soundStyle = 'real', total, onEffort, bestCombo, days, today, session, desktop = desktopApp(true, true) }) {
   const s = stats(total, onEffort, bestCombo, today, days)
   return {
     enabled,
     sound,
+    soundStyle,
     volume: 0.7,
     reducedMotion: 'off',
     stats: s,
@@ -122,17 +128,19 @@ function lashed(base, id, source, target, combo, comboTitle, levelUp = false) {
 
 const nivel5 = { total: 247, onEffort: 171, bestCombo: 6, days: [41, 37, 30, 22], today: 40, session: { ...opus, effort: 'medium', boost: 'high' } }
 const nivel9 = { total: 1412, onEffort: 1003, bestCombo: 14, days: [133, 120, 96, 88], today: 93, session: { ...opus, effort: 'high', boost: 'xhigh' } }
-const nivel9Activo = { ...nivel9, days: [...nivel9.days], desktop: desktopApp(true, true) }
+const nivel9Abierta = { ...nivel9, days: [...nivel9.days] }
 const nivel9Cerrada = { ...nivel9, days: [...nivel9.days], desktop: desktopApp(false, false) }
+const nivel9Sonidos = { ...nivel9, days: [...nivel9.days], soundStyle: 'real-4' }
 const nivel14 = { total: 6999, onEffort: 5120, bestCombo: 23, days: [402, 377, 351, 340], today: 350, session: { ...opus, effort: 'xhigh', boost: 'max' }, desktop: desktopApp(true, true) }
 
 // Cada escena: estado, latigazos y cuanto avanzar el reloj despues de cada uno.
-// Las angostas (340 px) son la barra lateral, donde vive el panel.
+// Las angostas (340 px) son la barra lateral, donde vive el panel; el alto de
+// cada una corta entre dos tarjetas, nunca a la mitad de una.
 const scenes = [
   {
     file: 'barra-lateral.png',
     seed: 29,
-    size: [340, 1250],
+    size: [340, 1327],
     state: viewState({ ...nivel9 }),
     steps: [
       { advance: 300 },
@@ -142,37 +150,44 @@ const scenes = [
     ],
   },
   {
-    file: 'modo-latigo-activo.png',
+    file: 'app-abierta.png',
     seed: 13,
-    size: [340, 700],
-    state: viewState({ ...nivel9Activo }),
+    size: [340, 721],
+    state: viewState({ ...nivel9Abierta }),
     steps: [{ advance: 900 }],
   },
   {
     file: 'app-cerrada.png',
     seed: 17,
-    size: [340, 666],
+    size: [340, 798],
     state: viewState({ ...nivel9Cerrada }),
     steps: [{ advance: 700 }],
   },
   {
+    file: 'sonidos.png',
+    seed: 23,
+    size: [340, 234],
+    state: viewState({ ...nivel9Sonidos }),
+    steps: [{ advance: 300 }],
+  },
+  {
     file: 'nivel-14-divino.png',
     seed: 41,
-    size: [340, 640],
+    size: [340, 721],
     state: viewState({ ...nivel14 }),
     steps: [{ advance: 1200 }, { message: lashed(nivel14, 'c1', 'desktop', 'effort', 1, '', true), advance: 330 }],
   },
   {
     file: 'apagado.png',
     seed: 1,
-    size: [340, 340],
-    state: viewState({ enabled: false, ...nivel9, days: [...nivel9.days] }),
+    size: [340, 430],
+    state: viewState({ enabled: false, ...nivel9, days: [...nivel9.days], desktop: desktopApp(true, false) }),
     steps: [{ advance: 100 }],
   },
   {
     file: 'ancho-completo.png',
     seed: 11,
-    size: [1280, 560],
+    size: [1280, 600],
     state: viewState({ ...nivel5 }),
     steps: [
       { advance: 400 },
@@ -207,8 +222,8 @@ for (const scene of scenes) {
     nonce: NONCE,
     scriptUri: '../../dist/webview.js',
     styleUri: '../../dist/webview.css',
-    crackSoundUri: '',
-    levelSoundUri: '',
+    // En las capturas no suena nada.
+    soundUris: {},
   })
   html = html
     .replace('<link rel="stylesheet"', '<link rel="stylesheet" href="theme-dark.css">\n<link rel="stylesheet"')

@@ -5,7 +5,7 @@ import { COMMANDS } from './commandIds'
 import type { StatusBarContent } from './statusBarFormat'
 import { formatStatusBar } from './statusBarFormat'
 
-/** El item de la derecha de la barra de estado: nivel, modo latigo y un clic para abrir el panel. */
+/** El item de la derecha de la barra de estado: interruptor, nivel y un clic para abrir el panel. */
 export class LatigoStatusBar implements vscode.Disposable {
   private readonly item: vscode.StatusBarItem
   private content: StatusBarContent = { text: '', tooltip: '' }

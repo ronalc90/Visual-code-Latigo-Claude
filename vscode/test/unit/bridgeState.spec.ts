@@ -1,7 +1,7 @@
 import * as assert from 'node:assert/strict'
 
 import type { LashEvent } from '../../../hooks/bridge'
-import { DESKTOP_TTL_MS, PRESENCE_TTL_MS } from '../../../hooks/bridge'
+import { DEFAULT_CONFIG, DESKTOP_TTL_MS, PRESENCE_TTL_MS } from '../../../hooks/bridge'
 import { EMPTY_STATS } from '../../../hooks/model'
 import type { BridgeSnapshot } from '../../src/bridgeState'
 import { BridgeState } from '../../src/bridgeState'
@@ -20,9 +20,9 @@ describe('BridgeState', () => {
   afterEach(() => bridge.cleanup())
 
   it('arranca con lo que hay en disco', () => {
-    bridge.store.writeConfig({ enabled: false, sound: false })
+    bridge.store.writeConfig({ enabled: false, sound: false, soundStyle: 'suave' })
     const state = new BridgeState(bridge.store, clock)
-    assert.deepEqual(state.snapshot.config, { enabled: false, sound: false })
+    assert.deepEqual(state.snapshot.config, { enabled: false, sound: false, soundStyle: 'suave' })
     assert.deepEqual(state.snapshot.stats, EMPTY_STATS)
     assert.equal(state.snapshot.session.alive, false)
   })
@@ -77,25 +77,45 @@ describe('BridgeState', () => {
     ])
   })
 
-  it('lee la app de escritorio: abierta, con el modo latigo, y cerrada cuando caduca', () => {
+  it('lee la app de escritorio: abierta con el puntero de latigo, y cerrada cuando caduca', () => {
     const state = new BridgeState(bridge.store, clock)
-    assert.deepEqual(state.snapshot.desktop, { alive: false, whipMode: false })
+    assert.deepEqual(state.snapshot.desktop, { alive: false, whipMode: false, hotkey: 'ok' })
     const seen: BridgeSnapshot[] = []
     state.onDidChange(snapshot => seen.push(snapshot))
-    writeRaw(bridge.store.paths.desktop, JSON.stringify({ at: clock.now(), whipMode: true }))
+    writeRaw(bridge.store.paths.desktop, JSON.stringify({ at: clock.now(), whipMode: true, hotkey: 'ok' }))
     state.refresh('desktop')
-    assert.deepEqual(state.snapshot.desktop, { alive: true, whipMode: true })
+    assert.deepEqual(state.snapshot.desktop, { alive: true, whipMode: true, hotkey: 'ok' })
     assert.equal(seen.length, 1)
     clock.advance(DESKTOP_TTL_MS + 1)
     state.refresh('presence')
-    // Cerrada, el modo latigo no cuenta aunque el archivo diga que si.
-    assert.deepEqual(state.snapshot.desktop, { alive: false, whipMode: false })
+    // Cerrada, el puntero de latigo no cuenta aunque el archivo diga que si.
+    assert.deepEqual(state.snapshot.desktop, { alive: false, whipMode: false, hotkey: 'ok' })
+  })
+
+  it('el atajo ocupado solo cuenta mientras la app este abierta', () => {
+    writeRaw(bridge.store.paths.desktop, JSON.stringify({ at: clock.now(), whipMode: false, hotkey: 'ocupado' }))
+    const state = new BridgeState(bridge.store, clock)
+    assert.deepEqual(state.snapshot.desktop, { alive: true, whipMode: false, hotkey: 'ocupado' })
+    clock.advance(DESKTOP_TTL_MS)
+    state.refresh('presence')
+    assert.deepEqual(state.snapshot.desktop, { alive: false, whipMode: false, hotkey: 'ok' })
+  })
+
+  it('el interruptor que cambia la app de escritorio (⌃⌘L o Esc) llega como cualquier cambio de config.json', () => {
+    const state = new BridgeState(bridge.store, clock)
+    const seen: boolean[] = []
+    state.onDidChange(snapshot => seen.push(snapshot.config.enabled))
+    writeRaw(bridge.store.paths.config, JSON.stringify({ version: 1, ...DEFAULT_CONFIG, enabled: false }))
+    state.refresh('config')
+    writeRaw(bridge.store.paths.config, JSON.stringify({ version: 1, ...DEFAULT_CONFIG, enabled: true }))
+    state.refresh('config')
+    assert.deepEqual(seen, [false, true])
   })
 
   it('un desktop.json roto deja la app por cerrada', () => {
     writeRaw(bridge.store.paths.desktop, '{roto')
     const state = new BridgeState(bridge.store, clock)
-    assert.deepEqual(state.snapshot.desktop, { alive: false, whipMode: false })
+    assert.deepEqual(state.snapshot.desktop, { alive: false, whipMode: false, hotkey: 'ok' })
   })
 
   it('un lash.json roto se ignora', () => {

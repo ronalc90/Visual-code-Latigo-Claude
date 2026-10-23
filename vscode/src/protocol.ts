@@ -1,14 +1,19 @@
 // Mensajes entre la extension y el webview del panel. Lo comparten los dos
 // lados; el host valida todo lo que llega porque el webview es otro proceso.
 
-import type { LashSource } from '../../hooks/bridge'
+import type { HotkeyStatus, LashSource } from '../../hooks/bridge'
 import type { Effort, Stats, Target } from '../../hooks/model'
+import type { SoundStyle } from '../../hooks/sounds'
+import { isSoundStyle } from '../../hooks/sounds'
 
 export type ReducedMotion = 'auto' | 'on' | 'off'
 
 export type ViewState = {
+  /** El unico interruptor del latigo (config.json). */
   enabled: boolean
   sound: boolean
+  /** El sonido elegido: cada latigazo toma un archivo al azar de este estilo. */
+  soundStyle: SoundStyle
   /** 0 a 1. */
   volume: number
   reducedMotion: ReducedMotion
@@ -22,12 +27,15 @@ export type ViewState = {
     effort: Effort | null
     boost: Effort | null
   }
-  /** La app de escritorio del latigo en pantalla. */
+  /** La app de escritorio, la que vuelve un latigo el puntero. */
   desktop: {
     /** La app existe para este sistema (por ahora solo Mac). */
     supported: boolean
     alive: boolean
+    /** El puntero es un latigo en este momento. */
     whipMode: boolean
+    /** `ocupado` cuando otra app tiene el atajo global de la app. */
+    hotkey: HotkeyStatus
     /** El ultimo intento de abrirla fallo: casi seguro no esta instalada. */
     appMissing: boolean
   }
@@ -54,8 +62,8 @@ export type WebviewMessage =
   | { type: 'lash'; target: Target }
   | { type: 'setEnabled'; enabled: boolean }
   | { type: 'setSound'; sound: boolean }
+  | { type: 'setSoundStyle'; style: SoundStyle }
   | { type: 'installPlugin' }
-  | { type: 'toggleWhipMode' }
   | { type: 'openDesktopApp' }
   | { type: 'openInstallGuide' }
 
@@ -72,7 +80,6 @@ export function parseWebviewMessage(value: unknown): WebviewMessage | null {
     case 'ready':
       return only() ? { type: 'ready' } : null
     case 'installPlugin':
-    case 'toggleWhipMode':
     case 'openDesktopApp':
     case 'openInstallGuide':
       return only() ? { type: value.type } : null
@@ -82,6 +89,8 @@ export function parseWebviewMessage(value: unknown): WebviewMessage | null {
       return only('enabled') && typeof value.enabled === 'boolean' ? { type: 'setEnabled', enabled: value.enabled } : null
     case 'setSound':
       return only('sound') && typeof value.sound === 'boolean' ? { type: 'setSound', sound: value.sound } : null
+    case 'setSoundStyle':
+      return only('style') && isSoundStyle(value.style) ? { type: 'setSoundStyle', style: value.style } : null
     default:
       return null
   }

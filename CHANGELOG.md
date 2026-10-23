@@ -1,5 +1,43 @@
 # Cambios
 
+## 0.5.0 · 2026-10-23
+
+Un solo interruptor, un latigazo de verdad y el sonido de un látigo real.
+
+### En todas partes
+- **Un solo interruptor.** *Látigo prendido* es lo mismo en la app, la consola y VS Code: prendido, la banda está en la consola y, con la app abierta, el puntero es un látigo. Se acabó el «modo látigo» aparte con su propio botón (y su archivo `whipmode.json`).
+- **Sonidos para elegir:** 6 grabaciones reales de látigo (CC0, de BigSoundBank) y dos sintéticos, *aire* y *suave*. Se eligen en el menú de la app, en la barra de VS Code o con `/latigo sonido <nombre>`.
+
+### App de escritorio
+- **El latigazo se ve de verdad.** La mano tira hacia atrás, un bucle sale del mango y corre hasta la punta cada vez más rápido, y la punta da la vuelta y revienta **justo en el clic**. Quedan estelas, la raya de la punta y la onda de choque. Antes era una onda chiquita que hacía ver el látigo como una caña de pescar.
+- **La cuerda sigue tu movimiento:** en línea recta queda tendida, en curva se curva y en zigzag ondula. Quieta, se acomoda en la mano, del lado contrario al movimiento y lejos del borde.
+- **El latigazo cambia con el movimiento:** quieto, recto, con giro (más curvo, con el bucle del lado del giro) o en zigzag (ondula y truena dos veces). Mientras más rápido, más corto y más fuerte.
+- **Suena como un látigo real, no como un *crash*.** El sintetizador nuevo está calibrado con 6 grabaciones: zumbido casi mudo, chasquido centrado en ~5 kHz y la cola de siseo, el *suufff*. Se quitaron el golpe grave y el tono. El chasquido cae justo cuando la punta llega al clic.
+- **En el golpe se ve el effort nuevo** (*effort ▲ high*, *effort ya en max*, *sin sesión de Claude Code*), porque el selector del chat de VS Code no se refresca cuando un plugin cambia el effort.
+- **`⌃⌘L` más firme:**
+  - se registra en exclusiva, y el menú avisa si otra app la tiene;
+  - la app cierra otras copias suyas;
+  - la primera vez que se abre desde Aplicaciones queda para abrir al iniciar sesión;
+  - al prender y apagar sale un aviso junto al puntero;
+  - `Latigo --diagnostico` revisa todo.
+- **Menú nuevo:** el interruptor; *Esc también lo apaga*, que se puede desmarcar; el sonido con vista previa; *Zumbido al mover el látigo*, que viene apagado; y el estado del atajo.
+- Solo redibuja la zona de la cuerda, y nada cuando está quieta.
+- 203 comprobaciones, entre ellas que cada archivo de sonido golpea donde dice su catálogo.
+
+### Plugin de Claude Code
+- **El sonido elegido**, y el chasquido cae cuando la banda revienta.
+- `/latigo sonidos`, `/latigo sonido <nombre>` y `/latigo sonido on|off`.
+- **Si Claude Code rechaza registrar `/latigo`, el látigo sigue funcionando** y lo reintenta. Pasa con el plugin cargado dos veces. Antes ese rechazo tumbaba todo el arranque («`session.start hook skipped`»).
+- 110 pruebas y 22 de punta a punta con Claude Code real.
+
+### Extensión de VS Code
+- **Un solo interruptor** con su atajo; se quitó el botón *Activar modo látigo*.
+- **Tarjeta de la app de escritorio:** abierta o cerrada (con botón para abrirla) y aviso si otra app tiene `⌃⌘L`.
+- **Sonido:** prender o apagar, elegir entre los 9 y *Probar*.
+- En Mac, el látigo vuelve a `⌃⌘L` (con la app abierta lo atiende la app, sin la app lo atiende VS Code).
+- El chasquido del panel cae con el golpe de su animación.
+- 191 pruebas unitarias y 36 en un VS Code real.
+
 ## 0.4.0 · 2026-10-22
 
 El látigo sale a la pantalla.

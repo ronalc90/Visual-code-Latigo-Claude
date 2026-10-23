@@ -7,17 +7,16 @@ export type StatusBarContent = {
   tooltip: string
 }
 
-const DESKTOP_CLOSED: DesktopInfo = { alive: false, whipMode: false }
+const DESKTOP_CLOSED: DesktopInfo = { alive: false, whipMode: false, hotkey: 'ok' }
 
-/** Texto y tooltip del item de la barra de estado. */
+/** Texto y tooltip del item de la barra de estado: el interruptor, el nivel y, si aplica, el puntero de latigo. */
 export function formatStatusBar(enabled: boolean, total: number, desktop: DesktopInfo = DESKTOP_CLOSED): StatusBarContent {
   const { tier, next, remaining, progress } = progressFor(total)
-  const whipMode = enabled && desktop.alive && desktop.whipMode
-  const head = !enabled ? '$(circle-slash) Látigo · apagado' : whipMode ? `$(zap) Modo látigo · Nv ${tier.level}` : `$(flame) Látigo · Nv ${tier.level}`
+  const head = enabled ? `$(flame) Látigo · Nv ${tier.level}` : '$(circle-slash) Látigo · apagado'
   const lines = [
-    enabled ? 'Látigo encendido' : 'Látigo apagado',
-    // Solo se menciona la app de escritorio cuando esta abierta.
-    ...(enabled && desktop.alive ? [whipMode ? 'Modo látigo en pantalla: activo (Esc para salir)' : 'Modo látigo en pantalla: apagado'] : []),
+    enabled ? 'Látigo prendido' : 'Látigo apagado',
+    // La app de escritorio solo se menciona cuando de verdad tiene el puntero hecho latigo.
+    ...(enabled && desktop.alive && desktop.whipMode ? ['Tu puntero es un látigo (app de escritorio)'] : []),
     `Nivel ${tier.level} · ${tier.name}`,
     next === null
       ? 'Nivel máximo: ya no hay más arriba'

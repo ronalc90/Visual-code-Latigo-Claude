@@ -3,7 +3,7 @@
 // en pantalla). Se refresca cuando el watcher avisa o cuando la extension
 // escribe algo.
 
-import type { DesktopPresence, LashEvent, LatigoConfig, Presence } from '../../hooks/bridge'
+import type { DesktopPresence, HotkeyStatus, LashEvent, LatigoConfig, Presence } from '../../hooks/bridge'
 import { isDesktopAlive, isPresenceAlive } from '../../hooks/bridge'
 import type { Stats } from '../../hooks/model'
 import { mergeStats } from '../../hooks/model'
@@ -22,8 +22,10 @@ export type SessionInfo = {
 export type DesktopInfo = {
   /** La app de escritorio escribio su presencia hace poco. */
   alive: boolean
-  /** El modo latigo (el puntero hecho latigo) esta activo; false si la app esta cerrada. */
+  /** El puntero es un latigo ahora mismo; false si la app esta cerrada. */
   whipMode: boolean
+  /** Si el atajo global de la app funciona; `ok` si la app esta cerrada. */
+  hotkey: HotkeyStatus
 }
 
 export type BridgeSnapshot = {
@@ -45,7 +47,8 @@ function sessionFrom(presence: Presence | null, now: number): SessionInfo {
 
 function desktopFrom(presence: DesktopPresence | null, now: number): DesktopInfo {
   const alive = isDesktopAlive(presence, now)
-  return { alive, whipMode: alive && presence?.whipMode === true }
+  // Cerrada, lo que diga el archivo ya no cuenta.
+  return { alive, whipMode: alive && presence?.whipMode === true, hotkey: alive ? (presence?.hotkey ?? 'ok') : 'ok' }
 }
 
 function sameSnapshot(a: BridgeSnapshot, b: BridgeSnapshot): boolean {

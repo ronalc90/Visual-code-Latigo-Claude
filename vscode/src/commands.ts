@@ -5,7 +5,7 @@ import type { LatigoController } from './controller'
 
 /** Registra los comandos de la paleta; cada uno delega en el controlador. */
 export function registerCommands(controller: LatigoController): vscode.Disposable[] {
-  const register = (id: string, run: () => unknown) => vscode.commands.registerCommand(id, run)
+  const register = (id: string, run: (...args: unknown[]) => unknown) => vscode.commands.registerCommand(id, run)
   return [
     register(COMMANDS.open, () => controller.open()),
     register(COMMANDS.toggle, () => controller.toggle()),
@@ -18,6 +18,7 @@ export function registerCommands(controller: LatigoController): vscode.Disposabl
     register(COMMANDS.soundOff, () => controller.setSound(false)),
     register(COMMANDS.showStats, () => controller.showStats()),
     register(COMMANDS.installClaudePlugin, () => controller.installClaudePlugin()),
-    register(COMMANDS.toggleWhipMode, () => controller.toggleWhipMode()),
+    // Con un estilo como argumento (p. ej. desde un atajo propio) lo guarda sin preguntar.
+    register(COMMANDS.chooseSound, style => controller.chooseSoundStyle(style)),
   ]
 }

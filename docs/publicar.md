@@ -4,10 +4,11 @@ Las dos piezas se publican por separado. El plugin de Claude Code no necesita ni
 
 ## Antes de cada versión
 
-1. Sube la versión en los tres manifiestos:
+1. Sube la versión en los cuatro manifiestos:
    - `.claude-plugin/plugin.json`
    - `.claude-plugin/marketplace.json` (la entrada del plugin)
    - `vscode/package.json`
+   - `desktop/Info.plist` (`CFBundleShortVersionString` y `CFBundleVersion`)
 2. Anota los cambios en `CHANGELOG.md` y en `vscode/CHANGELOG.md`.
 3. Corre todas las pruebas ([pruebas.md](pruebas.md)):
 
@@ -17,7 +18,8 @@ Las dos piezas se publican por separado. El plugin de Claude Code no necesita ni
    python scripts/e2e_puente.py --claude "$(which claude)"
    ```
 
-4. Si cambió algo visual, regenera las capturas: `scripts/capturas_terminal.py` y `cd vscode && npm run screenshots`.
+4. Si cambió algo visual, regenera las capturas: `scripts/capturas_terminal.py`, `cd vscode && npm run screenshots`, y las fotos y el GIF de la app ([pruebas.md](pruebas.md#capturas)).
+   Si cambió `desktop/Sources/Synth.swift`, regenera los sonidos sintéticos (las pruebas de la app fallan si no): `desktop/build/Látigo.app/Contents/MacOS/Latigo --render-sounds assets`.
 5. Haz push a `main`. La página del Marketplace toma las imágenes de `main` en GitHub, así que tienen que estar subidas antes de publicar la extensión.
 
 ## Plugin de Claude Code
@@ -81,7 +83,7 @@ npx ovsx publish latigo-claude-<versión>.vsix -p <token>
 Adjunta el `.vsix` a una versión de GitHub para quien prefiera instalarlo a mano:
 
 ```
-gh release create v0.2.0 vscode/latigo-claude-0.2.0.vsix --title "v0.2.0" --notes-file CHANGELOG.md
+gh release create v<versión> vscode/latigo-claude-<versión>.vsix desktop/build/Latigo-macOS.zip --title "v<versión>" --notes-file <notas de esta versión>
 ```
 
 ## Lista de revisión del Marketplace

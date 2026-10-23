@@ -18,6 +18,7 @@ import { LashService } from './lashService'
 import { LatigoViewProvider } from './panel/LatigoViewProvider'
 import type { LashAnimation, ViewState } from './protocol'
 import { readSettings } from './settings'
+import { pickSoundStyle } from './soundPicker'
 import { LatigoStatusBar } from './statusBar'
 
 /**
@@ -39,6 +40,8 @@ export type LatigoApi = {
   viewState(): ViewState
   /** El ultimo latigazo que se le mando a animar al panel. */
   lastPanelLash(): LashAnimation | null
+  /** Atiende un mensaje como si llegara del webview del panel (se valida igual). */
+  panelMessage(raw: unknown): void
 }
 
 export function activate(context: vscode.ExtensionContext): LatigoApi {
@@ -64,6 +67,7 @@ export function activate(context: vscode.ExtensionContext): LatigoApi {
     clock,
     readSettings: () => readSettings(vscode.workspace.getConfiguration('latigo')),
     desktopApp: { supported: isDesktopAppSupported(), launch: () => launchDesktopApp() },
+    pickSoundStyle,
   })
   const panel = new LatigoViewProvider(context.extensionUri, controller)
   controller.attachPanel(panel)
@@ -99,6 +103,7 @@ export function activate(context: vscode.ExtensionContext): LatigoApi {
     panelVisible: () => panel.isVisible,
     viewState: () => controller.currentState(),
     lastPanelLash: () => panel.lastLash,
+    panelMessage: raw => panel.receive(raw),
   }
 }
 

@@ -4,8 +4,10 @@
 
 import * as vscode from 'vscode'
 
-import type { WhipModeRequest } from '../../hooks/bridge'
+import type { LatigoConfig } from '../../hooks/bridge'
 import type { Target } from '../../hooks/model'
+import type { SoundStyle } from '../../hooks/sounds'
+import { isSoundStyle, soundStyle } from '../../hooks/sounds'
 import type { BridgeState } from './bridgeState'
 import type { BridgeStore } from './bridgeStore'
 import type { Clock } from './clock'
@@ -31,6 +33,8 @@ export type ControllerDeps = {
   readSettings: () => ExtensionSettings
   /** La app de escritorio: si existe para este sistema y como abrirla. */
   desktopApp: DesktopAppLauncher
+  /** Pregunta que sonido usar, partiendo del actual; undefined si la persona no eligio. */
+  pickSoundStyle: (current: SoundStyle) => Promise<SoundStyle | undefined>
 }
 
 export type DesktopAppLauncher = {
@@ -38,9 +42,6 @@ export type DesktopAppLauncher = {
   /** Abre la app; se rechaza si no se pudo (casi siempre porque no esta instalada). */
   launch(): Promise<void>
 }
-
-const OPEN_APP = 'Abrir la app'
-const INSTALL_GUIDE = 'Cómo instalarla'
 
 export class LatigoController implements PanelHost, vscode.Disposable {
   private panel: LatigoViewProvider | undefined
@@ -96,14 +97,14 @@ export class LatigoController implements PanelHost, vscode.Disposable {
       case 'setSound':
         this.setSound(message.sound)
         return
+      case 'setSoundStyle':
+        this.selectSoundStyle(message.style)
+        return
       case 'installPlugin':
         this.installClaudePlugin()
         return
-      case 'toggleWhipMode':
-        this.toggleWhipMode({ fromPanel: true })
-        return
       case 'openDesktopApp':
-        void this.openDesktopApp({ fromPanel: true })
+        void this.openDesktopApp()
         return
       case 'openInstallGuide':
         void this.openInstallGuide()
@@ -124,6 +125,7 @@ export class LatigoController implements PanelHost, vscode.Disposable {
     await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
   }
 
+  /** El unico interruptor: lo usan el atajo, la paleta y los botones del titulo del panel. */
   toggle(): boolean {
     return this.setEnabled(!this.deps.store.readConfig().enabled, { announce: true })
   }
@@ -131,7 +133,8 @@ export class LatigoController implements PanelHost, vscode.Disposable {
   setEnabled(enabled: boolean, options: { announce: boolean }): boolean {
     const config = this.saveConfig({ enabled })
     if (config === null) return this.deps.store.readConfig().enabled
-    if (options.announce) void vscode.window.showInformationMessage(config.enabled ? 'Látigo encendido' : 'Látigo apagado')
+    // El atajo se usa seguido: basta un aviso corto en la barra de estado.
+    if (options.announce) void vscode.window.setStatusBarMessage(config.enabled ? '$(flame) Látigo prendido' : '$(circle-slash) Látigo apagado', 2500)
     // Prenderlo estando en una conversacion de Claude lo muestra de una vez.
     if (config.enabled && this.deps.isClaudeActive()) this.onClaudeFocused()
     return config.enabled
@@ -142,8 +145,36 @@ export class LatigoController implements PanelHost, vscode.Disposable {
     return config === null ? this.deps.store.readConfig().sound : config.sound
   }
 
-  /** Guarda en config.json; si el disco no deja, avisa y devuelve null. */
-  private saveConfig(patch: { enabled?: boolean; sound?: boolean }): { enabled: boolean; sound: boolean } | null {
+  toggleSound(): boolean {
+    const sound = this.setSound(!this.deps.store.readConfig().sound)
+    void vscode.window.setStatusBarMessage(sound ? 'Látigo: sonido prendido' : 'Látigo: sonido apagado', 2500)
+    return sound
+  }
+
+  /** Desde el panel: guarda el estilo y prende el sonido, como `/latigo sonido <estilo>` en Claude Code. */
+  selectSoundStyle(style: SoundStyle): SoundStyle {
+    const config = this.saveConfig({ soundStyle: style, sound: true })
+    return config === null ? this.deps.store.readConfig().soundStyle : config.soundStyle
+  }
+
+  /**
+   * «Látigo: Elegir sonido». Con un estilo valido como argumento lo guarda de
+   * una; si no, muestra la lista. Solo guarda el estilo: el interruptor del
+   * sonido queda como estaba. Devuelve el estilo guardado, o null si no se eligio.
+   */
+  async chooseSoundStyle(requested?: unknown): Promise<SoundStyle | null> {
+    const current = this.deps.store.readConfig().soundStyle
+    const style = isSoundStyle(requested) ? requested : await this.deps.pickSoundStyle(current)
+    if (style === undefined) return null
+    const config = this.saveConfig({ soundStyle: style })
+    if (config === null) return null
+    const muted = config.sound ? '' : ' (el sonido está apagado)'
+    void vscode.window.setStatusBarMessage(`Látigo: sonido «${soundStyle(style).label}»${muted}`, 3000)
+    return config.soundStyle
+  }
+
+  /** Guarda en config.json solo lo pedido; si el disco no deja, avisa y devuelve null. */
+  private saveConfig(patch: Partial<LatigoConfig>): LatigoConfig | null {
     try {
       const config = this.deps.store.updateConfig(patch)
       this.deps.state.refresh('config')
@@ -159,12 +190,6 @@ export class LatigoController implements PanelHost, vscode.Disposable {
     void vscode.window.showErrorMessage(`Látigo: no se pudo escribir en ${this.deps.store.paths.dir} (${reason}).`)
   }
 
-  toggleSound(): boolean {
-    const sound = this.setSound(!this.deps.store.readConfig().sound)
-    void vscode.window.setStatusBarMessage(sound ? 'Látigo: sonido prendido' : 'Látigo: sonido apagado', 2500)
-    return sound
-  }
-
   lash(target: Target, options: { fromPanel: boolean } = { fromPanel: false }): LashResult | null {
     let result: LashResult | null
     try {
@@ -175,7 +200,7 @@ export class LatigoController implements PanelHost, vscode.Disposable {
       return null
     }
     if (result === null) {
-      void vscode.window.showInformationMessage('El látigo está apagado. Préndelo con «Látigo: Encender/Apagar».')
+      void vscode.window.showInformationMessage('El látigo está apagado. Préndelo con el interruptor del panel o con «Látigo: Prender/Apagar».')
       return null
     }
     this.deps.state.refresh('stats')
@@ -206,49 +231,11 @@ export class LatigoController implements PanelHost, vscode.Disposable {
   }
 
   /**
-   * Le pide a la app de escritorio prender o apagar el modo latigo (el puntero
-   * hecho latigo). Devuelve el pedido escrito, o null si no se pudo pedir.
+   * Abre la app de escritorio (boton del panel). Si no se pudo, casi seguro no
+   * esta instalada: el panel lo dice y ofrece la guia. Devuelve si la abrio.
    */
-  toggleWhipMode(options: { fromPanel: boolean } = { fromPanel: false }): WhipModeRequest | null {
-    // Se relee para no decidir con una foto de hace un par de segundos.
-    this.deps.state.refresh('desktop')
-    const { config, desktop } = this.deps.state.snapshot
-    if (!config.enabled) {
-      void vscode.window.showInformationMessage('El látigo está apagado. Préndelo con «Látigo: Encender/Apagar».')
-      return null
-    }
-    if (!this.deps.desktopApp.supported) {
-      void vscode.window.showInformationMessage('El modo látigo en pantalla está disponible por ahora solo en Mac.')
-      return null
-    }
-    if (!desktop.alive) {
-      // Desde el panel ya se ve el boton para abrir la app.
-      if (!options.fromPanel) void this.offerToOpenDesktopApp()
-      return null
-    }
-    try {
-      const request = this.deps.store.requestWhipMode(!desktop.whipMode)
-      if (!options.fromPanel) {
-        void vscode.window.setStatusBarMessage(request.active ? '$(zap) Prendiendo el modo látigo…' : 'Apagando el modo látigo…', 2500)
-      }
-      return request
-    } catch (error) {
-      this.reportDiskError(error)
-      return null
-    }
-  }
-
-  private async offerToOpenDesktopApp(): Promise<void> {
-    const choice = await vscode.window.showInformationMessage('La app de escritorio del látigo no está abierta.', OPEN_APP)
-    if (choice === OPEN_APP) await this.openDesktopApp()
-  }
-
-  /** Abre la app de escritorio. Si no esta instalada, el panel lo dice y apunta a la guia. */
-  async openDesktopApp(options: { fromPanel: boolean } = { fromPanel: false }): Promise<boolean> {
-    if (!this.deps.desktopApp.supported) {
-      void vscode.window.showInformationMessage('La app de escritorio del látigo está disponible por ahora solo en Mac.')
-      return false
-    }
+  async openDesktopApp(): Promise<boolean> {
+    if (!this.deps.desktopApp.supported) return false
     try {
       await this.deps.desktopApp.launch()
       this.desktopAppMissing = false
@@ -257,10 +244,6 @@ export class LatigoController implements PanelHost, vscode.Disposable {
     } catch {
       this.desktopAppMissing = true
       this.render()
-      if (!options.fromPanel) {
-        const choice = await vscode.window.showWarningMessage('No se encontró la app «Látigo» en este Mac.', INSTALL_GUIDE)
-        if (choice === INSTALL_GUIDE) await this.openInstallGuide()
-      }
       return false
     }
   }

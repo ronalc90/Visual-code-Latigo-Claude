@@ -2,6 +2,31 @@
 
 Todos los cambios importantes de la extensión **Látigo para Claude Code**.
 
+## [0.5.0] - 2026-10-23
+
+Un solo interruptor y sonidos de látigo para elegir.
+
+### Cambiado
+
+- **Un solo interruptor.** «Látigo prendido / apagado» es el único control: va primero y en grande, con su atajo a la vista y una línea que explica qué hace en ese momento. Con la app de escritorio abierta, prenderlo vuelve tu puntero un látigo; apagarlo lo deja normal. Ya no hay un «modo látigo» aparte.
+- **Atajo `⌃⌘L` en Mac** (`Ctrl+Cmd+L`); en Windows y Linux sigue siendo `Shift+Alt+L`. Con la app de escritorio abierta, `⌃⌘L` funciona en todo el sistema y hace lo mismo.
+- **Tarjeta «App de escritorio»** (solo en Mac): dice si está abierta y si tu puntero es un látigo, cómo apagarlo (`Esc` o `⌃⌘L`), ofrece **Abrir la app** si está cerrada y **Cómo instalarla** si no está instalada. Avisa si otra app tiene ocupado `⌃⌘L`.
+- Los comandos **Encender/Apagar** pasan a llamarse **Prender/Apagar**, y prender o apagar con el atajo avisa en la barra de estado en lugar de una notificación.
+- La barra de estado muestra siempre `Látigo · Nv N` con el látigo prendido; el tooltip dice cuando tu puntero es un látigo.
+
+### Agregado
+
+- **Sonidos para elegir:** 9 estilos (6 grabaciones de látigos reales, uno que las alterna al azar, uno sintético y uno suave para la oficina). Fila de sonido en el panel con el interruptor, el desplegable con la descripción de cada estilo y el botón **Probar**, que suena aunque el sonido esté apagado.
+- Elegir un estilo en el panel lo guarda en `~/.claude-latigo/config.json` y prende el sonido, igual que `/latigo sonido <estilo>` en Claude Code.
+- Comando **Látigo: Elegir sonido**: una lista con los 9 estilos, abierta en el que suena ahora; solo cambia el estilo. Acepta el estilo como argumento para asignarle un atajo propio.
+- El chasquido de cada latigazo cae justo en el impacto de la animación del panel, sea cual sea la grabación.
+
+### Quitado
+
+- La tarjeta **Modo látigo en pantalla**, su botón *Activar/Apagar modo látigo* y el comando **Látigo: Prender/Apagar el modo látigo en pantalla**.
+- El archivo `~/.claude-latigo/whipmode.json`: la extensión ya no le pide nada a la app; las dos siguen el mismo interruptor.
+- El sonido único `latigo.wav`.
+
 ## [0.4.0] - 2026-10-22
 
 El látigo grande se va a la app de escritorio: la barra lateral pasa a ser el panel de estadísticas y control.

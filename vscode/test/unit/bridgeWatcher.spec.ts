@@ -28,15 +28,15 @@ describe('BridgeWatcher', function () {
     await waitFor(() => seen.includes('config'))
     bridge.store.incrementEffortSeq(1)
     await waitFor(() => seen.includes('effort'))
-    fs.writeFileSync(bridge.store.paths.desktop, JSON.stringify({ at: 1, whipMode: true }))
+    fs.writeFileSync(bridge.store.paths.desktop, JSON.stringify({ at: 1, whipMode: true, hotkey: 'ok' }))
     await waitFor(() => seen.includes('desktop'))
   })
 
-  it('no vigila whipmode.json: lo escribe la propia extension', async () => {
+  it('ignora el whipmode.json de la version 0.4: ya no hay un modo latigo aparte', async () => {
     const seen: BridgeFile[] = []
     watcher = new BridgeWatcher(bridge.store.paths, file => seen.push(file), { debounceMs: 20, pollIntervalMs: 50 })
     watcher.start()
-    bridge.store.requestWhipMode(true)
+    fs.writeFileSync(`${bridge.store.paths.dir}/whipmode.json`, JSON.stringify({ version: 1, seq: 3, active: true }))
     await new Promise(resolve => setTimeout(resolve, 250))
     assert.deepEqual(seen, [])
   })

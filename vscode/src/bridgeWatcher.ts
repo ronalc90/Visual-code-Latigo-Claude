@@ -9,7 +9,7 @@ import * as path from 'node:path'
 import type { BridgePaths } from '../../hooks/bridge'
 import type { Disposable } from './events'
 
-/** Los archivos que se vigilan; whipmode.json no, porque lo escribe la propia extension. */
+/** Los archivos del puente que se vigilan; cualquier otro de la carpeta se ignora. */
 export type BridgeFile = 'config' | 'stats' | 'effort' | 'lash' | 'presence' | 'desktop'
 
 export const BRIDGE_FILES: readonly BridgeFile[] = ['config', 'stats', 'effort', 'lash', 'presence', 'desktop']

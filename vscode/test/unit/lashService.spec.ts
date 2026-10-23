@@ -1,6 +1,6 @@
 import * as assert from 'node:assert/strict'
 
-import { PRESENCE_TTL_MS } from '../../../hooks/bridge'
+import { DEFAULT_CONFIG, PRESENCE_TTL_MS } from '../../../hooks/bridge'
 import { TIERS } from '../../../hooks/levels'
 import { COMBO_WINDOW_MS, EMPTY_STATS } from '../../../hooks/model'
 import type { LashResult } from '../../src/lashService'
@@ -191,7 +191,7 @@ describe('LashService', () => {
   describe('interruptor y sonido', () => {
     it('apagado no hace nada: ni conteos, ni effort, ni lash.json, ni eventos', () => {
       alive()
-      bridge.store.writeConfig({ enabled: false, sound: true })
+      bridge.store.writeConfig({ ...DEFAULT_CONFIG, enabled: false })
       let fired = 0
       service.onDidLash(() => fired++)
       assert.equal(service.lash('effort'), null)
@@ -203,15 +203,15 @@ describe('LashService', () => {
     })
 
     it('apagado tampoco arma combo para cuando lo prendan', () => {
-      bridge.store.writeConfig({ enabled: false, sound: true })
+      bridge.store.writeConfig({ ...DEFAULT_CONFIG, enabled: false })
       service.lash('model')
-      bridge.store.writeConfig({ enabled: true, sound: true })
+      bridge.store.writeConfig({ ...DEFAULT_CONFIG, enabled: true })
       assert.equal(service.lash('model')!.combo, 1)
     })
 
     it('el resultado lleva el flag de sonido de config.json', () => {
       assert.equal(service.lash('model')!.sound, true)
-      bridge.store.writeConfig({ enabled: true, sound: false })
+      bridge.store.writeConfig({ ...DEFAULT_CONFIG, sound: false })
       assert.equal(service.lash('model')!.sound, false)
     })
   })

@@ -23,6 +23,7 @@ export function buildViewState(
   return {
     enabled: snapshot.config.enabled,
     sound: snapshot.config.sound,
+    soundStyle: snapshot.config.soundStyle,
     volume: settings.volume,
     reducedMotion: settings.reducedMotion,
     stats: snapshot.stats,
@@ -33,6 +34,7 @@ export function buildViewState(
       supported: desktopApp.supported,
       alive: snapshot.desktop.alive,
       whipMode: snapshot.desktop.whipMode,
+      hotkey: snapshot.desktop.hotkey,
       // Si la app ya esta abierta, el intento fallido quedo atras.
       appMissing: desktopApp.appMissing && !snapshot.desktop.alive,
     },

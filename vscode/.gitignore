@@ -1,7 +1,8 @@
 node_modules/
 dist/
 out/
-media/*.wav
+# Lo arma el build con los sonidos de assets/.
+media/
 .vscode-test/
 *.vsix
 .DS_Store

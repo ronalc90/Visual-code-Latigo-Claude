@@ -3,9 +3,11 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import { COMMANDS, VIEW_CONTAINER_ID, VIEW_ID } from '../../src/commandIds'
+import { TOGGLE_KEY_LABEL, TOGGLE_KEYBINDING, toggleKeyLabel } from '../../src/shortcuts'
 
 type Manifest = {
   name: string
+  version: string
   publisher: string
   categories: string[]
   main: string
@@ -33,20 +35,30 @@ describe('package.json', () => {
     assert.ok(manifest.contributes.commands.every(command => command.category === 'Látigo'))
   })
 
-  it('el atajo de encender/apagar esta declarado para mac, windows y linux', () => {
+  it('el interruptor tiene su atajo: ⌃⌘L en Mac y Shift+Alt+L en Windows y Linux', () => {
     const binding = manifest.contributes.keybindings.find(item => item.command === COMMANDS.toggle)
-    assert.ok(binding)
-    // Ctrl+Cmd+L es del modo latigo de la app de escritorio (atajo global).
-    assert.equal(binding.mac, undefined)
-    assert.equal(binding.key, 'shift+alt+l')
-    assert.equal(binding.linux, undefined)
-    assert.equal(binding.win, undefined)
+    // Exacto: Windows y Linux usan `key`, sin `win` ni `linux` que lo pisen.
+    assert.deepEqual(binding, { command: COMMANDS.toggle, key: 'shift+alt+l', mac: 'ctrl+cmd+l' })
   })
 
-  it('el modo latigo en pantalla no tiene atajo en VS Code (Ctrl+Cmd+L lo tiene la app de escritorio)', () => {
-    assert.ok(!manifest.contributes.keybindings.some(item => item.command === COMMANDS.toggleWhipMode))
-    const command = manifest.contributes.commands.find(item => item.command === COMMANDS.toggleWhipMode)
-    assert.equal(command?.title, 'Prender/Apagar el modo látigo en pantalla')
+  it('el panel muestra el mismo atajo que declara el manifiesto', () => {
+    const binding = manifest.contributes.keybindings.find(item => item.command === COMMANDS.toggle)
+    assert.equal(binding?.mac, TOGGLE_KEYBINDING.mac)
+    assert.equal(binding?.key, TOGGLE_KEYBINDING.other)
+    assert.equal(TOGGLE_KEY_LABEL.mac, '⌃⌘L')
+    assert.equal(TOGGLE_KEY_LABEL.other, 'Shift+Alt+L')
+    assert.equal(toggleKeyLabel('MacIntel'), '⌃⌘L')
+    assert.equal(toggleKeyLabel('darwin'), '⌃⌘L')
+    assert.equal(toggleKeyLabel('Win32'), 'Shift+Alt+L')
+    assert.equal(toggleKeyLabel('Linux x86_64'), 'Shift+Alt+L')
+  })
+
+  it('un solo atajo y un solo interruptor: no hay un modo latigo aparte', () => {
+    assert.deepEqual(manifest.contributes.keybindings.map(item => item.command), [COMMANDS.toggle])
+    assert.ok(!manifest.contributes.commands.some(item => /modo látigo/i.test(item.title) || item.command === 'latigo.toggleWhipMode'))
+    const titles = Object.fromEntries(manifest.contributes.commands.map(item => [item.command, item.title]))
+    assert.equal(titles[COMMANDS.toggle], 'Prender/Apagar')
+    assert.equal(titles[COMMANDS.chooseSound], 'Elegir sonido')
   })
 
   it('ningun atajo usa Ctrl+Alt+letra (en Windows es AltGr y tapa letras como la ł)', () => {
@@ -77,6 +89,12 @@ describe('package.json', () => {
     assert.equal(properties['latigo.showStatusBar']?.default, true)
     assert.equal(properties['latigo.reducedMotion']?.default, 'auto')
     assert.equal(properties['latigo.volume']?.default, 0.7)
+  })
+
+  it('la version del manifiesto tiene su entrada en el CHANGELOG', () => {
+    const changelog = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8')
+    const latest = /^## \[(\d+\.\d+\.\d+)\]/m.exec(changelog)?.[1]
+    assert.equal(latest, manifest.version)
   })
 
   it('identidad, icono y categorias validas para el Marketplace', () => {

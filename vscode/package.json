@@ -1,8 +1,8 @@
 {
   "name": "latigo-claude",
   "displayName": "Látigo para Claude Code",
-  "description": "Un látigo para Claude Code en VS Code: tus latigazos, tu nivel y el modo látigo en pantalla a un clic, en la barra lateral.",
-  "version": "0.4.0",
+  "description": "Un látigo para Claude Code en VS Code: un solo interruptor, sonidos de látigo para elegir, tu nivel y tus latigazos en la barra lateral.",
+  "version": "0.5.0",
   "publisher": "ronalc90",
   "author": {
     "name": "Ronald Cipagauta",
@@ -55,12 +55,12 @@
       },
       {
         "command": "latigo.toggle",
-        "title": "Encender/Apagar",
+        "title": "Prender/Apagar",
         "category": "Látigo"
       },
       {
         "command": "latigo.turnOn",
-        "title": "Encender",
+        "title": "Prender",
         "category": "Látigo",
         "icon": "$(circle-slash)"
       },
@@ -111,16 +111,16 @@
         "icon": "$(terminal)"
       },
       {
-        "command": "latigo.toggleWhipMode",
-        "title": "Prender/Apagar el modo látigo en pantalla",
-        "category": "Látigo",
-        "icon": "$(zap)"
+        "command": "latigo.chooseSound",
+        "title": "Elegir sonido",
+        "category": "Látigo"
       }
     ],
     "keybindings": [
       {
         "command": "latigo.toggle",
-        "key": "shift+alt+l"
+        "key": "shift+alt+l",
+        "mac": "ctrl+cmd+l"
       }
     ],
     "viewsContainers": {
@@ -227,7 +227,7 @@
           "minimum": 0,
           "maximum": 1,
           "order": 3,
-          "markdownDescription": "Volumen del latigazo y de la subida de nivel en el panel, de `0` a `1`. El sonido se prende y se apaga con el interruptor del panel."
+          "markdownDescription": "Volumen del latigazo y de la subida de nivel en el panel, de `0` a `1`. El sonido se prende, se apaga y se elige en el panel o con **Látigo: Elegir sonido**."
         }
       }
     }

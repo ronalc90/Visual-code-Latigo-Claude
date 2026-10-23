@@ -12,13 +12,21 @@ final class HotKey {
     private static var isInstalled = false
     private var reference: EventHotKeyRef?
     private let id: UInt32
+    /// `.ocupado` si otra app ya tenia la combinacion: puede que no llegue aqui.
+    private(set) var status = HotKeyStatus.ok
 
     init(keyCode: Int, modifiers: Int, id: UInt32, handler: @escaping () -> Void) {
         self.id = id
         HotKey.installHandler()
         HotKey.handlers[id] = handler
         let hotKeyID = EventHotKeyID(signature: OSType(0x4C41_5447), id: id) // 'LATG'
-        RegisterEventHotKey(UInt32(keyCode), UInt32(modifiers), hotKeyID, GetApplicationEventTarget(), 0, &reference)
+        // Primero en exclusiva: si otra app ya la tiene, falla y se avisa.
+        var result = RegisterEventHotKey(UInt32(keyCode), UInt32(modifiers), hotKeyID, GetEventDispatcherTarget(), OptionBits(kEventHotKeyExclusive), &reference)
+        if result != noErr {
+            status = .ocupado
+            result = RegisterEventHotKey(UInt32(keyCode), UInt32(modifiers), hotKeyID, GetEventDispatcherTarget(), 0, &reference)
+            if result != noErr { reference = nil }
+        }
     }
 
     deinit { unregister() }
@@ -33,7 +41,7 @@ final class HotKey {
         guard !isInstalled else { return }
         isInstalled = true
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { _, event, _ in
+        InstallEventHandler(GetEventDispatcherTarget(), { _, event, _ in
             var hotKeyID = EventHotKeyID()
             GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil,
                               MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
@@ -89,10 +97,14 @@ final class WhipAudio {
     private var nextPlayer = 0
     private let format = AVAudioFormat(standardFormatWithSampleRate: WhipSound.sampleRate, channels: 1)!
     private var levelUpPlayer: AVAudioPlayer?
+    /// Las grabaciones ya leidas, por ruta.
+    private var clips: [String: [Float]] = [:]
+    private let resources: URL?
 
-    init() {
+    init(resources: URL? = Bundle.main.resourceURL) {
+        self.resources = resources
         // Varios reproductores para que los latigazos de un combo se monten.
-        for _ in 0..<5 {
+        for _ in 0..<6 {
             let player = AVAudioPlayerNode()
             engine.attach(player)
             engine.connect(player, to: engine.mainMixerNode, format: format)
@@ -101,8 +113,14 @@ final class WhipAudio {
         try? engine.start()
     }
 
-    func play(_ samples: [Float], volume: Float = 0.9) {
-        guard !samples.isEmpty, let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)) else { return }
+    /// Toca `samples` dentro de `delay` segundos.
+    func play(_ samples: [Float], volume: Float = 0.9, after delay: Double = 0) {
+        guard !samples.isEmpty else { return }
+        if delay > 0.001 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.play(samples, volume: volume) }
+            return
+        }
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)) else { return }
         buffer.frameLength = AVAudioFrameCount(samples.count)
         samples.withUnsafeBufferPointer { source in
             buffer.floatChannelData![0].update(from: source.baseAddress!, count: samples.count)
@@ -116,11 +134,36 @@ final class WhipAudio {
         player.play()
     }
 
-    func playLevelUp() {
-        guard let url = Bundle.main.url(forResource: "nivel", withExtension: "wav") else { return }
-        levelUpPlayer = try? AVAudioPlayer(contentsOf: url)
-        levelUpPlayer?.volume = 0.8
-        levelUpPlayer?.play()
+    /// Toca un archivo del catalogo: espera `delay` y arranca `offset` segundos adentro.
+    func play(_ file: SoundFile, volume: Float, after delay: Double, from offset: Double) {
+        guard let samples = samples(for: file) else { return }
+        let start = min(samples.count, Int(offset * WhipSound.sampleRate))
+        play(Array(samples[start...]), volume: volume, after: delay)
+    }
+
+    func samples(for file: SoundFile) -> [Float]? {
+        if let cached = clips[file.path] { return cached }
+        guard let url = resources?.appendingPathComponent(file.path), let samples = WhipAudio.load(url) else { return nil }
+        clips[file.path] = samples
+        return samples
+    }
+
+    /// Lee un WAV mono de 44,1 kHz (los de assets/sonidos).
+    static func load(_ url: URL) -> [Float]? {
+        guard let file = try? AVAudioFile(forReading: url), file.processingFormat.sampleRate == WhipSound.sampleRate,
+              let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)),
+              (try? file.read(into: buffer)) != nil, let channel = buffer.floatChannelData?[0]
+        else { return nil }
+        return Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
+    }
+
+    func playLevelUp(after delay: Double = 0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self, let url = self.resources?.appendingPathComponent("nivel.wav") else { return }
+            self.levelUpPlayer = try? AVAudioPlayer(contentsOf: url)
+            self.levelUpPlayer?.volume = 0.8
+            self.levelUpPlayer?.play()
+        }
     }
 }
 
@@ -133,7 +176,7 @@ final class OverlayView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext, let window, let scene = scene() else { return }
-        context.clear(bounds)
+        context.clear(dirtyRect)
         Renderer.draw(scene, in: context, origin: Vec(x: window.frame.origin.x, y: window.frame.origin.y))
     }
 }
@@ -154,6 +197,16 @@ final class OverlayWindow: NSWindow {
         isReleasedWhenClosed = false
         contentView = overlay
         setFrame(screen.frame, display: false)
+    }
+
+    /// Vuelve a dibujar `rect` (coordenadas de pantalla), o todo si es nil.
+    func invalidate(_ rect: CGRect?) {
+        guard let rect else {
+            overlay.needsDisplay = true
+            return
+        }
+        let local = rect.offsetBy(dx: -frame.origin.x, dy: -frame.origin.y).intersection(overlay.bounds)
+        if !local.isNull && !local.isEmpty { overlay.setNeedsDisplay(local) }
     }
 
     override var canBecomeKey: Bool { false }

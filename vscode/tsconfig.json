@@ -15,5 +15,5 @@
     "types": ["node", "mocha", "vscode"],
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "webview/**/*.ts", "test/**/*.ts", "../hooks/model.ts", "../hooks/levels.ts", "../hooks/bridge.ts"]
+  "include": ["src/**/*.ts", "webview/**/*.ts", "test/**/*.ts", "../hooks/model.ts", "../hooks/levels.ts", "../hooks/bridge.ts", "../hooks/sounds.ts"]
 }

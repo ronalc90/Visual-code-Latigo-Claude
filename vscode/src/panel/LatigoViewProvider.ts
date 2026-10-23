@@ -3,6 +3,7 @@ import * as vscode from 'vscode'
 import { VIEW_ID } from '../commandIds'
 import type { HostMessage, LashAnimation, ViewState, WebviewMessage } from '../protocol'
 import { parseWebviewMessage } from '../protocol'
+import { soundAssetPaths } from '../soundAssets'
 import { createNonce, renderPanelHtml } from './html'
 
 /** Lo que el panel le pide a la extension; lo implementa el cableado de extension.ts. */
@@ -29,30 +30,36 @@ export class LatigoViewProvider implements vscode.WebviewViewProvider, vscode.Di
     const media = vscode.Uri.joinPath(this.extensionUri, 'media')
     const dist = vscode.Uri.joinPath(this.extensionUri, 'dist')
     view.webview.options = { enableScripts: true, localResourceRoots: [media, dist] }
+    // Cada sonido con su URI del webview, por su ruta dentro de media/ (p. ej. sonidos/real-1.wav).
+    const soundUris = Object.fromEntries(
+      soundAssetPaths().map(path => [path, view.webview.asWebviewUri(vscode.Uri.joinPath(media, ...path.split('/'))).toString()]),
+    )
     view.webview.html = renderPanelHtml({
       cspSource: view.webview.cspSource,
       nonce: createNonce(),
       scriptUri: view.webview.asWebviewUri(vscode.Uri.joinPath(dist, 'webview.js')).toString(),
       styleUri: view.webview.asWebviewUri(vscode.Uri.joinPath(dist, 'webview.css')).toString(),
-      crackSoundUri: view.webview.asWebviewUri(vscode.Uri.joinPath(media, 'latigo.wav')).toString(),
-      levelSoundUri: view.webview.asWebviewUri(vscode.Uri.joinPath(media, 'nivel.wav')).toString(),
+      soundUris,
     })
     this.disposables.push(
-      view.webview.onDidReceiveMessage((raw: unknown) => {
-        const message = parseWebviewMessage(raw)
-        if (message === null) return
-        if (message.type === 'ready') {
-          this.ready = true
-          this.postState(this.host.currentState())
-          return
-        }
-        this.host.handleMessage(message)
-      }),
+      view.webview.onDidReceiveMessage((raw: unknown) => this.receive(raw)),
       view.onDidDispose(() => {
         this.view = undefined
         this.ready = false
       }),
     )
+  }
+
+  /** Un mensaje del webview: se valida y, si es conocido, se atiende. */
+  receive(raw: unknown): void {
+    const message = parseWebviewMessage(raw)
+    if (message === null) return
+    if (message.type === 'ready') {
+      this.ready = true
+      this.postState(this.host.currentState())
+      return
+    }
+    this.host.handleMessage(message)
   }
 
   /**

@@ -6,6 +6,44 @@ import Foundation
 
 enum Target: String { case model, effort }
 
+/// Los niveles de effort de Claude Code, como EFFORTS en hooks/model.ts.
+enum Effort: String, CaseIterable {
+    case low, medium, high, xhigh, max
+
+    static let standard = Effort.medium
+
+    /// Un nivel mas (nil si ya esta en max).
+    var raised: Effort? {
+        let all = Effort.allCases
+        let index = all.firstIndex(of: self)!
+        return index + 1 < all.count ? all[index + 1] : nil
+    }
+
+    /// El que de verdad sale: el mayor entre el de la sesion y el forzado (effectiveEffort).
+    static func effective(session: Effort?, forced: Effort?) -> Effort? {
+        guard let forced else { return session }
+        guard let session else { return forced }
+        let all = Effort.allCases
+        return all.firstIndex(of: forced)! > all.firstIndex(of: session)! ? forced : session
+    }
+}
+
+/// A que effort sube un latigazo, para mostrarlo en el golpe. La sesion avisa su
+/// effort cada 3 s; si los latigazos llegan mas rapido, se cuenta desde el ultimo.
+struct EffortForecast {
+    private var last: (effort: Effort, at: Double)?
+
+    /// `session` y `boost` como los escribio la sesion a los `presenceAt` ms; `now` en ms.
+    /// nil: ya esta en max.
+    mutating func next(session: Effort?, boost: Effort?, presenceAt: Double, now: Double) -> Effort? {
+        var base = Effort.effective(session: session, forced: boost) ?? .standard
+        if let last, last.at > presenceAt { base = Effort.effective(session: base, forced: last.effort) ?? base }
+        let raised = base.raised
+        last = (raised ?? base, now)
+        return raised
+    }
+}
+
 struct Stats: Equatable {
     var total = 0, onModel = 0, onEffort = 0, bestCombo = 0
     var byDay: [String: Int] = [:]

@@ -28,6 +28,8 @@ type World = {
   sounds: string[]
   toasts: string[]
   commands: string[]
+  /** Mientras sea true, Claude Code rechaza registrar comandos (como con el plugin repetido). */
+  refuseRegister: boolean
   /** Lo que el plugin pidio con /effort. */
   efforts: string[]
   clock: ReturnType<typeof mock.clock>
@@ -35,7 +37,7 @@ type World = {
 
 /** Arma el mundo de mentira bajo el mod. */
 function world(on: On, files: Record<string, string> = {}, store: Record<string, unknown> = {}, reduceMotion = false, env: Record<string, string> = { HOME }): World {
-  const state: World = { files: new Map(Object.entries(files)), sounds: [], toasts: [], commands: [], efforts: [], clock: mock.clock(on, { now: Date.UTC(2026, 9, 22, 15, 0) }) }
+  const state: World = { files: new Map(Object.entries(files)), sounds: [], toasts: [], commands: [], refuseRegister: false, efforts: [], clock: mock.clock(on, { now: Date.UTC(2026, 9, 22, 15, 0) }) }
   mock.store(on, store)
   mock.env(on, env)
   on('fs.read', ($, e) => {
@@ -49,6 +51,7 @@ function world(on: On, files: Record<string, string> = {}, store: Record<string,
   on('fs.exists', ($, e) => ({ value: state.files.has(e.path) }))
   on('session.model', () => ({ value: 'claude-opus-5-5' }))
   on('command.register', ($, e) => {
+    if (state.refuseRegister) return { deny: `latigo: $.command.register refused: no hooks module of that name is loaded` }
     state.commands.push(e.name)
     return { value: { command: e.name } }
   })
@@ -84,7 +87,7 @@ describe('arranque', () => {
   test('crea la configuracion compartida y avisa que hay sesion', async ($, on) => {
     const w = world(on)
     await start($)
-    expect(json(w, 'config.json')).toEqual({ version: 1, enabled: true, sound: true })
+    expect(json(w, 'config.json')).toEqual({ version: 1, enabled: true, sound: true, soundStyle: 'real' })
     expect(json(w, 'presence.json')).toMatchObject({ model: 'claude-opus-5-5', effort: null, boost: null })
   })
 
@@ -124,7 +127,7 @@ describe('la banda', () => {
 
       expect(await ui.find({ key: 'effort' })).toMatchObject({ props: { label: 'effort: high ⚡' } })
       expect(w.sounds).toHaveLength(1)
-      expect(w.sounds[0]).toMatch(/^assets\/latigo(-[23])?\.wav$/)
+      expect(w.sounds[0]).toMatch(/^assets\/sonidos\/real-[1-6]\.wav$/)
       expect(json(w, 'stats.json')).toMatchObject({ stats: { total: 1, onEffort: 1 } })
       expect(json(w, 'lash.json')).toMatchObject({ target: 'effort', source: 'terminal', total: 1, combo: 1 })
       expect(json(w, 'presence.json')).toMatchObject({ boost: 'high' })
@@ -219,6 +222,8 @@ describe('la banda', () => {
     expect((await ui.find({ text: /^[ ✦✶✷❋✺]+$/ }))?.text).toBe(idle)
     await ui.press({ key: 'model' })
     expect(await ui.find({ text: /CHAAAAS/ })).toBeDefined()
+    // El golpe se ve enseguida, asi que el sonido tambien sale enseguida.
+    expect(w.sounds).toHaveLength(1)
     await ui.unmount()
   })
 
@@ -227,6 +232,7 @@ describe('la banda', () => {
     await start($)
     const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
     await ui.press({ key: 'model' })
+    await w.clock.advance(1000)
     expect(w.sounds).toEqual([])
     await ui.unmount()
   })
@@ -460,6 +466,23 @@ describe('lo que encontro la revision', () => {
     await ui.unmount()
   })
 
+  test('si Claude Code rechaza registrar /latigo, el latigo sigue andando y lo reintenta', async ($, on) => {
+    const w = world(on)
+    w.refuseRegister = true
+    await start($)
+    expect(w.commands).toEqual([])
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await ui.press({ key: 'effort' })
+    await w.clock.advance(2000)
+    expect(await ui.find({ key: 'effort' })).toMatchObject({ props: { label: 'effort: high ⚡' } })
+    w.refuseRegister = false
+    await w.clock.advance(7000)
+    expect(w.commands).toEqual(['latigo', 'latigazo'])
+    await w.clock.advance(7000)
+    expect(w.commands).toEqual(['latigo', 'latigazo'])
+    await ui.unmount()
+  })
+
   test('/latigo se vuelve a registrar tras un /clear', async ($, on) => {
     const w = world(on)
     await start($)
@@ -630,6 +653,18 @@ describe('puente con VS Code', () => {
     await ui.unmount()
   })
 
+  test('el sonido elegido en VS Code o en la app se usa aqui', async ($, on) => {
+    const w = world(on)
+    await start($)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    w.files.set(`${DIR}/config.json`, '{"version":1,"enabled":true,"sound":true,"soundStyle":"suave"}')
+    await w.clock.advance(700)
+    await ui.press({ key: 'effort' })
+    await w.clock.advance(400)
+    expect(w.sounds[0]).toMatch(/^assets\/sonidos\/suave-[12]\.wav$/)
+    await ui.unmount()
+  })
+
   test('archivos rotos en el puente no tumban nada', async ($, on) => {
     const w = world(on, {
       [`${DIR}/config.json`]: '{roto',
@@ -702,5 +737,62 @@ describe('/latigo', () => {
     const result = (await run($, 'ayuda')) as { text: string }
     expect(result.text).toContain('/latigo on')
     expect(result.text).toContain('/latigo calma')
+    expect(result.text).toContain('/latigo sonidos')
+  })
+
+  test('sonidos lista los nueve y marca el elegido', async ($, on) => {
+    world(on)
+    await start($)
+    const text = ((await run($, 'sonidos')) as { text: string }).text
+    expect(text).toContain('| ▶ | Real · al azar |')
+    expect(text).toContain('`/latigo sonido real-4`')
+    expect(text).toContain('`/latigo sonido suave`')
+    expect(text).toContain('El sonido está prendido')
+  })
+
+  test('sonido <nombre> lo elige, lo guarda, lo deja oir y lo usa en cada latigazo', async ($, on) => {
+    const w = world(on)
+    await start($)
+    expect(((await run($, 'sonido Real-4')) as { text: string }).text).toBe('Sonido: Real 4 · suufff largo.')
+    expect(json(w, 'config.json')).toMatchObject({ sound: true, soundStyle: 'real-4' })
+    expect(w.sounds).toEqual(['assets/sonidos/real-4.wav'])
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await ui.press({ key: 'effort' })
+    expect(w.sounds).toEqual(['assets/sonidos/real-4.wav'])
+    // real-4 golpea a los 180 ms: suena a los 170 para que el golpe caiga cuando la banda revienta (350 ms).
+    await w.clock.advance(169)
+    expect(w.sounds).toHaveLength(1)
+    await w.clock.advance(2)
+    expect(w.sounds).toEqual(['assets/sonidos/real-4.wav', 'assets/sonidos/real-4.wav'])
+    expect(((await run($, 'sonidos')) as { text: string }).text).toContain('| ▶ | Real 4 · suufff largo |')
+    await ui.unmount()
+  })
+
+  test('elegir un sonido con el sonido apagado lo prende', async ($, on) => {
+    const w = world(on, { [`${DIR}/config.json`]: '{"version":1,"enabled":true,"sound":false}' })
+    await start($)
+    await run($, 'sonido aire')
+    expect(json(w, 'config.json')).toMatchObject({ sound: true, soundStyle: 'aire' })
+    expect(w.sounds[0]).toMatch(/^assets\/sonidos\/aire-[1-4]\.wav$/)
+  })
+
+  test('un sonido que no existe no cambia nada y muestra la lista', async ($, on) => {
+    const w = world(on)
+    await start($)
+    const text = ((await run($, 'sonido tambor')) as { text: string }).text
+    expect(text).toContain('No conozco el sonido «tambor»')
+    expect(text).toContain('Real · al azar')
+    expect(json(w, 'config.json')).toMatchObject({ soundStyle: 'real' })
+    expect(w.sounds).toEqual([])
+  })
+
+  test('sonido on y sonido off dicen lo que hacen', async ($, on) => {
+    const w = world(on)
+    await start($)
+    expect(((await run($, 'sonido off')) as { text: string }).text).toBe('Sonido apagado.')
+    expect(((await run($, 'sonido off')) as { text: string }).text).toBe('Sonido apagado.')
+    expect(json(w, 'config.json')).toMatchObject({ sound: false })
+    expect(((await run($, 'sonido on')) as { text: string }).text).toBe('Sonido encendido.')
+    expect(json(w, 'config.json')).toMatchObject({ sound: true, soundStyle: 'real' })
   })
 })

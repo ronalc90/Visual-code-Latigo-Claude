@@ -156,7 +156,7 @@ export function statsTable(stats: Stats, today: string, boost: Effort | null, en
     '',
     '_El ranking con apodo entre todos los que usan el látigo llega en una próxima versión._',
     '',
-    '`/latigo on` · `/latigo off` · `/latigo calma` · `/latigo sonido` · `/latigo ayuda`',
+    '`/latigo on` · `/latigo off` · `/latigo calma` · `/latigo sonidos` · `/latigo ayuda`',
   )
   return lines.join('\n')
 }
@@ -169,7 +169,10 @@ export const HELP_TEXT = [
   '| `/latigo` | Tu tabla: nivel, latigazos, combos y días |',
   '| `/latigo on` · `/latigo off` | Prende o apaga el látigo (también en VS Code) |',
   '| `/latigo calma` | Quita el effort que forzó el látigo |',
+  '| `/latigazo` | Latigazo al effort: lo sube un nivel |',
   '| `/latigo sonido` | Prende o apaga el sonido |',
+  '| `/latigo sonidos` | Los sonidos para elegir (grabaciones reales y sintéticos) |',
+  '| `/latigo sonido real-4` | Elige un sonido |',
   '',
   'En la banda: clic en el modelo (solo visual) o en el effort (lo sube un nivel). Con la banda enfocada (`ctrl+x tab`): `e` effort, `m` modelo, `o` prende/apaga.',
 ].join('\n')

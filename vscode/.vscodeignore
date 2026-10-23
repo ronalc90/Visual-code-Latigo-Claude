@@ -7,7 +7,7 @@
 !dist/extension.js
 !dist/webview.js
 !dist/webview.css
-!media/latigo.wav
 !media/nivel.wav
+!media/sonidos/*.wav
 !images/icon.png
 !images/whip.svg

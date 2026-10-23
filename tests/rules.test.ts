@@ -11,9 +11,7 @@ import {
   isDesktopAlive,
   isPresenceAlive,
   parseDesktopPresence,
-  parseWhipModeRequest,
   serializeDesktopPresence,
-  serializeWhipModeRequest,
   parseConfig,
   parseEffortRequests,
   parseEffortRequestsStrict,
@@ -26,6 +24,7 @@ import {
   serializePresence,
   serializeStats,
 } from '../hooks/bridge'
+import { SOUND_STYLES, crackDelayMs, isSoundStyle, pickSoundFile, soundStyle } from '../hooks/sounds'
 import { MAX_LEVEL, TIERS, isLevelUp, lookFor, mixHex, progressBar, progressFor, seededRandom, sparkRow } from '../hooks/levels'
 import {
   COMBO_WINDOW_MS,
@@ -292,12 +291,11 @@ describe('puente', () => {
       lash: '/Users/ana/.claude-latigo/lash.json',
       presence: '/Users/ana/.claude-latigo/presence.json',
       desktop: '/Users/ana/.claude-latigo/desktop.json',
-      whipMode: '/Users/ana/.claude-latigo/whipmode.json',
     })
   })
 
   test('la configuracion va y vuelve, y lo roto da los valores por defecto', async () => {
-    expect(parseConfig(serializeConfig({ enabled: false, sound: true }))).toEqual({ enabled: false, sound: true })
+    expect(parseConfig(serializeConfig({ enabled: false, sound: true, soundStyle: 'aire' }))).toEqual({ enabled: false, sound: true, soundStyle: 'aire' })
     expect(parseConfig(null)).toEqual(DEFAULT_CONFIG)
     expect(parseConfig('{no es json')).toEqual(DEFAULT_CONFIG)
     expect(parseConfig('[]')).toEqual(DEFAULT_CONFIG)
@@ -337,15 +335,19 @@ describe('puente', () => {
     expect(parseLashEvent('{"id":"x","target":"model","source":"terminal","combo":0}')).toMatchObject({ combo: 1, total: 0 })
   })
 
-  test('la app de escritorio: presencia y pedido del modo latigo', async () => {
-    const desktop = { at: 1000, whipMode: true }
+  test('la app de escritorio: presencia, puntero de latigo y estado del atajo', async () => {
+    const desktop = { at: 1000, whipMode: true, hotkey: 'ocupado' as const }
     expect(parseDesktopPresence(serializeDesktopPresence(desktop))).toEqual(desktop)
-    expect(parseDesktopPresence('{"at":5}')).toEqual({ at: 5, whipMode: false })
+    expect(parseDesktopPresence('{"at":5}')).toEqual({ at: 5, whipMode: false, hotkey: 'ok' })
     expect(parseDesktopPresence('basura')).toBe(null)
     expect(isDesktopAlive(desktop, 1000 + DESKTOP_TTL_MS - 1)).toBe(true)
     expect(isDesktopAlive(desktop, 1000 + DESKTOP_TTL_MS)).toBe(false)
-    expect(parseWhipModeRequest(serializeWhipModeRequest({ seq: 3, active: true }))).toEqual({ seq: 3, active: true })
-    expect(parseWhipModeRequest('{"seq":1}')).toBe(null)
+  })
+
+  test('el estilo de sonido va y viene en la configuracion, y uno desconocido da el de siempre', async () => {
+    expect(parseConfig(serializeConfig({ enabled: true, sound: true, soundStyle: 'real-4' }))).toEqual({ enabled: true, sound: true, soundStyle: 'real-4' })
+    expect(parseConfig('{"enabled":false,"soundStyle":"tambor"}')).toEqual({ enabled: false, sound: true, soundStyle: 'real' })
+    expect(DEFAULT_CONFIG.soundStyle).toBe('real')
   })
 
   test('la presencia caduca a los 15 segundos', async () => {
@@ -356,6 +358,39 @@ describe('puente', () => {
     expect(isPresenceAlive(presence, 1000 + PRESENCE_TTL_MS)).toBe(false)
     expect(isPresenceAlive(presence, 500)).toBe(false)
     expect(isPresenceAlive(null, 1000)).toBe(false)
+  })
+})
+
+describe('sonidos', () => {
+  test('nueve estilos, cada uno con sus archivos y sin repetidos', async () => {
+    expect(SOUND_STYLES.map(style => style.id)).toEqual(['real', 'real-1', 'real-2', 'real-3', 'real-4', 'real-5', 'real-6', 'aire', 'suave'])
+    for (const style of SOUND_STYLES) {
+      expect(style.files.length > 0).toBe(true)
+      expect(new Set(style.files.map(file => file.path)).size).toBe(style.files.length)
+      for (const file of style.files) {
+        expect(file.path).toMatch(/^sonidos\/[a-z0-9-]+\.wav$/)
+        // El golpe llega rapido: nunca despues de que la banda ya reventó.
+        expect(file.crackAtMs >= 50 && file.crackAtMs <= 360).toBe(true)
+      }
+    }
+    expect(soundStyle('real').files).toHaveLength(6)
+    expect(soundStyle('real-4').files[0]).toEqual(soundStyle('real').files[3])
+  })
+
+  test('elegir archivo cubre todo el estilo y nunca se sale', async () => {
+    expect(pickSoundFile('real', 0).path).toBe('sonidos/real-1.wav')
+    expect(pickSoundFile('real', 0.999).path).toBe('sonidos/real-6.wav')
+    expect(pickSoundFile('real', 1).path).toBe('sonidos/real-6.wav')
+    expect(pickSoundFile('real-4', 0.5).path).toBe('sonidos/real-4.wav')
+    expect(pickSoundFile('aire', -3).path).toBe('sonidos/aire-1.wav')
+    expect(isSoundStyle('suave')).toBe(true)
+    expect(isSoundStyle('crash')).toBe(false)
+  })
+
+  test('el play se adelanta lo justo para que el golpe caiga en el impacto', async () => {
+    expect(crackDelayMs({ path: 'x', crackAtMs: 150 }, 350)).toBe(200)
+    expect(crackDelayMs({ path: 'x', crackAtMs: 353 }, 350)).toBe(0)
+    expect(crackDelayMs({ path: 'x', crackAtMs: 150 }, 0)).toBe(0)
   })
 })
 

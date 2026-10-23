@@ -25,6 +25,8 @@ export type CrackOptions = { combo: number; levelUp: boolean }
 export const CRACK_DURATION = 0.62
 /** Momento del golpe dentro del chasquido (0 a 1). */
 export const CRACK_AT = 0.32
+/** Cuando pega el golpe, en ms desde que arranca el chasquido (ahi tiene que sonar). */
+export const IMPACT_MS = CRACK_DURATION * CRACK_AT * 1000
 
 const WIND_END = 0.2
 /** Grosor del cuero junto al mango y en la punta. */

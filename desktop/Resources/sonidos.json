@@ -1,0 +1,140 @@
+{
+ "default": "real",
+ "styles": [
+  {
+   "id": "real",
+   "label": "Real · al azar",
+   "description": "Cada latigazo usa una de las 6 grabaciones reales.",
+   "files": [
+    {
+     "path": "sonidos/real-1.wav",
+     "crackAtMs": 150
+    },
+    {
+     "path": "sonidos/real-2.wav",
+     "crackAtMs": 150
+    },
+    {
+     "path": "sonidos/real-3.wav",
+     "crackAtMs": 150
+    },
+    {
+     "path": "sonidos/real-4.wav",
+     "crackAtMs": 180
+    },
+    {
+     "path": "sonidos/real-5.wav",
+     "crackAtMs": 346
+    },
+    {
+     "path": "sonidos/real-6.wav",
+     "crackAtMs": 353
+    }
+   ]
+  },
+  {
+   "id": "real-1",
+   "label": "Real 1 · seco",
+   "description": "Chasquido limpio y corto.",
+   "files": [
+    {
+     "path": "sonidos/real-1.wav",
+     "crackAtMs": 150
+    }
+   ]
+  },
+  {
+   "id": "real-2",
+   "label": "Real 2 · doble",
+   "description": "Dos chasquidos casi juntos.",
+   "files": [
+    {
+     "path": "sonidos/real-2.wav",
+     "crackAtMs": 150
+    }
+   ]
+  },
+  {
+   "id": "real-3",
+   "label": "Real 3 · corto",
+   "description": "Chasquido corto con un eco leve.",
+   "files": [
+    {
+     "path": "sonidos/real-3.wav",
+     "crackAtMs": 150
+    }
+   ]
+  },
+  {
+   "id": "real-4",
+   "label": "Real 4 · suufff largo",
+   "description": "El siseo del aire se queda sonando.",
+   "files": [
+    {
+     "path": "sonidos/real-4.wav",
+     "crackAtMs": 180
+    }
+   ]
+  },
+  {
+   "id": "real-5",
+   "label": "Real 5 · completo",
+   "description": "Se oye el látigo cortando el aire antes del golpe.",
+   "files": [
+    {
+     "path": "sonidos/real-5.wav",
+     "crackAtMs": 346
+    }
+   ]
+  },
+  {
+   "id": "real-6",
+   "label": "Real 6 · completo 2",
+   "description": "Otro latigazo completo, más seco.",
+   "files": [
+    {
+     "path": "sonidos/real-6.wav",
+     "crackAtMs": 353
+    }
+   ]
+  },
+  {
+   "id": "aire",
+   "label": "Aire · sintético",
+   "description": "Hecho imitando las grabaciones; en la app de escritorio cambia con cómo mueves el mouse.",
+   "files": [
+    {
+     "path": "sonidos/aire-1.wav",
+     "crackAtMs": 160
+    },
+    {
+     "path": "sonidos/aire-2.wav",
+     "crackAtMs": 140
+    },
+    {
+     "path": "sonidos/aire-3.wav",
+     "crackAtMs": 200
+    },
+    {
+     "path": "sonidos/aire-4.wav",
+     "crackAtMs": 180
+    }
+   ]
+  },
+  {
+   "id": "suave",
+   "label": "Suave · para la oficina",
+   "description": "Un chasquido bajito y corto.",
+   "files": [
+    {
+     "path": "sonidos/suave-1.wav",
+     "crackAtMs": 90
+    },
+    {
+     "path": "sonidos/suave-2.wav",
+     "crackAtMs": 110
+    }
+   ]
+  }
+ ]
+}

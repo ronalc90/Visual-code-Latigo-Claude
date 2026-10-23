@@ -1,17 +1,24 @@
-// El panel del latigo en la barra lateral: estadisticas y controles. Pinta el
-// estado que manda la extension, anima en la vista previa los latigazos que
-// llegan (de VS Code, de la terminal o del latigo en pantalla) y le avisa a la
-// extension de los clics. No toca disco ni red.
+// El panel del latigo en la barra lateral: el interruptor, el sonido, la app de
+// escritorio, la sesion, el nivel y las estadisticas. Pinta el estado que manda
+// la extension, anima en la vista previa los latigazos que llegan (de VS Code,
+// de la terminal o del latigo en pantalla) y le avisa a la extension de los
+// clics. No toca disco ni red.
 
 import './style.css'
 
 import { MAX_LEVEL, lookFor, progressFor, seededRandom } from '../../hooks/levels'
 import type { Target } from '../../hooks/model'
 import { effectiveEffort, isForcing } from '../../hooks/model'
+import type { SoundStyle } from '../../hooks/sounds'
+import { DEFAULT_SOUND_STYLE, isSoundStyle, soundStyle } from '../../hooks/sounds'
 import { formatCount, formatDay, plural } from '../src/format'
+import { desktopCard, switchHint } from '../src/panelStatus'
 import type { HostMessage, LashAnimation, ViewState, WebviewMessage } from '../src/protocol'
-import { SoundPlayer } from './sound'
-import { CRACK_AT, CRACK_DURATION, WhipPreview } from './whipPreview'
+import { toggleKeyLabel } from '../src/shortcuts'
+import { LEVEL_SOUND } from '../src/soundAssets'
+import { SoundPlayer, parseSoundUris } from './sound'
+import { planLashSound, planTestSound } from './soundPlan'
+import { IMPACT_MS, WhipPreview } from './whipPreview'
 
 type VsCodeApi = { postMessage(message: WebviewMessage): void }
 
@@ -38,24 +45,28 @@ function byId<T extends HTMLElement>(id: string): T {
 
 const ui = {
   app: byId<HTMLDivElement>('app'),
-  offCard: byId<HTMLElement>('off-card'),
-  onView: byId<HTMLElement>('on-view'),
+  powerCard: byId<HTMLElement>('power-card'),
   enabledSwitch: byId<HTMLInputElement>('enabled-switch'),
-  enabledLabel: byId<HTMLSpanElement>('enabled-label'),
-  soundSwitch: byId<HTMLInputElement>('sound-switch'),
+  enabledLabel: byId<HTMLElement>('enabled-label'),
   toggleKey: byId<HTMLElement>('toggle-key'),
-  whipCard: byId<HTMLElement>('whip-card'),
-  whipPill: byId<HTMLElement>('whip-pill'),
-  whipReady: byId<HTMLElement>('whip-ready'),
-  whipToggle: byId<HTMLButtonElement>('whip-toggle'),
-  whipToggleLabel: byId<HTMLElement>('whip-toggle-label'),
-  whipClosed: byId<HTMLElement>('whip-closed'),
-  whipMissing: byId<HTMLElement>('whip-missing'),
-  whipUnsupported: byId<HTMLElement>('whip-unsupported'),
-  whipExplain: byId<HTMLElement>('whip-explain'),
+  powerHint: byId<HTMLElement>('power-hint'),
+  soundBlock: byId<HTMLElement>('sound-block'),
+  soundSwitch: byId<HTMLInputElement>('sound-switch'),
+  soundPicker: byId<HTMLSelectElement>('sound-style'),
+  soundTest: byId<HTMLButtonElement>('sound-test'),
+  soundAbout: byId<HTMLElement>('sound-about'),
+  desktop: byId<HTMLElement>('desktop-card'),
+  desktopDot: byId<HTMLElement>('desktop-dot'),
+  desktopStatus: byId<HTMLElement>('desktop-status'),
+  desktopHint: byId<HTMLElement>('desktop-hint'),
+  desktopWarning: byId<HTMLElement>('desktop-warning'),
+  desktopOpen: byId<HTMLElement>('desktop-open'),
+  desktopInstall: byId<HTMLElement>('desktop-install'),
   openApp: byId<HTMLButtonElement>('open-app'),
   openAppRetry: byId<HTMLButtonElement>('open-app-retry'),
   installGuide: byId<HTMLButtonElement>('install-guide'),
+  offCard: byId<HTMLElement>('off-card'),
+  onView: byId<HTMLElement>('on-view'),
   sessionPill: byId<HTMLElement>('session-pill'),
   modelName: byId<HTMLElement>('model-name'),
   effortValue: byId<HTMLElement>('effort-value'),
@@ -85,14 +96,21 @@ const ui = {
 
 const random = demo ? seededRandom(Number(params.get('seed') ?? 7)) : seededRandom(Date.now() >>> 0)
 const scene = new WhipPreview(random)
-const sounds = demo
-  ? new SoundPlayer({ crack: undefined, level: undefined })
-  : new SoundPlayer({ crack: document.body.dataset.crackSound, level: document.body.dataset.levelSound })
+// En las capturas no suena nada.
+const sounds = new SoundPlayer(demo ? new Map() : parseSoundUris(document.body.dataset.sounds))
+sounds.prepare([LEVEL_SOUND])
 const context = ui.canvas.getContext('2d')
+
+/** El volumen por defecto del ajuste latigo.volume, mientras llega el estado. */
+const DEFAULT_VOLUME = 0.7
 
 let state: ViewState | null = null
 /** Total que se esta mostrando (sube con cada latigazo antes de que llegue el estado). */
 let shownTotal = 0
+
+function volume(): number {
+  return state?.volume ?? DEFAULT_VOLUME
+}
 
 // --- Linea de tiempo de efectos de la interfaz (sirve igual en modo demo) ---
 
@@ -146,12 +164,7 @@ function shortModel(name: string): string {
   return name.replace(/^claude-/, '').replace(/\[.*\]$/, '')
 }
 
-function toggleKeyLabel(): string {
-  const platform = navigator.platform.toLowerCase()
-  return platform.includes('mac') ? 'Shift+Option+L' : 'Shift+Alt+L'
-}
-
-type PillTone = 'live' | 'hot' | 'idle' | 'warn'
+type PillTone = 'live' | 'idle'
 
 function setPill(pill: HTMLElement, text: string, tone: PillTone): void {
   pill.textContent = text
@@ -176,6 +189,55 @@ function applyLook(total: number): void {
   ui.levelRemaining.textContent =
     next === null ? 'Nivel máximo: más dorado no se puede' : `faltan ${plural(remaining, 'latigazo', 'latigazos')} para ${next.name}`
   scene.setTotal(total)
+}
+
+/** El interruptor unico: estado, y que hace el latigo en este momento. */
+function renderSwitch(view: ViewState): void {
+  ui.enabledSwitch.checked = view.enabled
+  ui.enabledLabel.textContent = view.enabled ? 'Látigo prendido' : 'Látigo apagado'
+  ui.powerCard.classList.toggle('is-on', view.enabled)
+  ui.powerHint.textContent = switchHint(view.enabled, view.desktop)
+}
+
+function showSoundAbout(style: SoundStyle): void {
+  const description = soundStyle(style).description
+  ui.soundAbout.textContent = description
+  ui.soundPicker.title = description
+}
+
+function renderSound(view: ViewState): void {
+  // Apagado el latigo no suena nada: la fila del sonido no hace falta.
+  ui.soundBlock.hidden = !view.enabled
+  ui.soundSwitch.checked = view.sound
+  ui.soundPicker.value = view.soundStyle
+  showSoundAbout(view.soundStyle)
+  sounds.prepare(soundStyle(view.soundStyle).files.map(file => file.path))
+}
+
+/** Mientras se abre la app de escritorio, el boton espera. */
+let pendingOpen: { timer: number } | null = null
+
+function clearPendingOpen(): void {
+  if (pendingOpen !== null) window.clearTimeout(pendingOpen.timer)
+  pendingOpen = null
+}
+
+function renderDesktop(view: ViewState): void {
+  const card = desktopCard(view.enabled, view.desktop)
+  ui.desktop.hidden = card.kind === 'hidden'
+  ui.desktop.dataset.kind = card.kind
+  ui.desktopDot.className = `dot dot-${card.tone}`
+  ui.desktopStatus.textContent = card.status
+  ui.desktopHint.textContent = card.hint
+  ui.desktopHint.hidden = card.hint === ''
+  ui.desktopWarning.textContent = card.warning ?? ''
+  ui.desktopWarning.hidden = card.warning === null
+  ui.desktopOpen.hidden = card.action !== 'open'
+  ui.desktopInstall.hidden = card.action !== 'install'
+  const opening = pendingOpen !== null
+  ui.openApp.disabled = opening
+  ui.openApp.textContent = opening ? 'Abriendo…' : 'Abrir la app'
+  ui.openAppRetry.disabled = opening
 }
 
 function renderStats(view: ViewState): void {
@@ -235,63 +297,6 @@ function renderSession(view: ViewState): void {
   }
 }
 
-// --- Modo latigo en pantalla ---
-
-/** Lo pedido con un boton que la app todavia no confirma: mientras tanto el boton espera. */
-let pendingWhip: { active: boolean; timer: number } | null = null
-let pendingOpen: { timer: number } | null = null
-
-function clearPendingWhip(): void {
-  if (pendingWhip !== null) window.clearTimeout(pendingWhip.timer)
-  pendingWhip = null
-}
-
-function clearPendingOpen(): void {
-  if (pendingOpen !== null) window.clearTimeout(pendingOpen.timer)
-  pendingOpen = null
-}
-
-function whipButtonLabel(whipMode: boolean): string {
-  if (pendingWhip !== null) return pendingWhip.active ? 'Activando…' : 'Apagando…'
-  return whipMode ? 'Apagar modo látigo' : 'Activar modo látigo'
-}
-
-function whipExplanation(ready: boolean, whipMode: boolean): string {
-  if (ready && whipMode) return 'Tu puntero es un látigo: cada clic sobre una conversación de Claude le sube el effort.'
-  if (ready) return 'Convierte tu puntero en un látigo sobre toda la pantalla.'
-  return 'La app de escritorio convierte tu puntero en un látigo: cada clic sobre una conversación de Claude le sube el effort.'
-}
-
-function renderWhipMode(view: ViewState): void {
-  const desktop = view.desktop
-  if (pendingWhip !== null && (!desktop.alive || desktop.whipMode === pendingWhip.active)) clearPendingWhip()
-  if (pendingOpen !== null && (desktop.alive || desktop.appMissing)) clearPendingOpen()
-
-  const ready = desktop.supported && desktop.alive
-  const missing = desktop.supported && !desktop.alive && desktop.appMissing
-  const closed = desktop.supported && !desktop.alive && !desktop.appMissing
-  ui.whipReady.hidden = !ready
-  ui.whipClosed.hidden = !closed
-  ui.whipMissing.hidden = !missing
-  ui.whipUnsupported.hidden = desktop.supported
-  ui.whipCard.classList.toggle('is-active', ready && desktop.whipMode)
-
-  if (!desktop.supported) setPill(ui.whipPill, 'Solo Mac', 'idle')
-  else if (missing) setPill(ui.whipPill, 'No instalada', 'warn')
-  else if (closed) setPill(ui.whipPill, 'App cerrada', 'idle')
-  else if (desktop.whipMode) setPill(ui.whipPill, 'Activo', 'hot')
-  else setPill(ui.whipPill, 'Listo', 'live')
-
-  ui.whipToggle.disabled = pendingWhip !== null
-  ui.whipToggle.classList.toggle('is-on', desktop.whipMode)
-  ui.whipToggle.setAttribute('aria-pressed', String(desktop.whipMode))
-  ui.whipToggleLabel.textContent = whipButtonLabel(desktop.whipMode)
-  ui.openApp.disabled = pendingOpen !== null
-  ui.openApp.textContent = pendingOpen !== null ? 'Abriendo…' : 'Abrir la app'
-  ui.openAppRetry.disabled = pendingOpen !== null
-  ui.whipExplain.textContent = whipExplanation(ready, desktop.whipMode)
-}
-
 function render(view: ViewState): void {
   const wasOff = !ui.app.classList.contains('is-on')
   ui.app.classList.remove('is-loading')
@@ -299,15 +304,13 @@ function render(view: ViewState): void {
   ui.app.classList.toggle('is-off', !view.enabled)
   ui.offCard.hidden = view.enabled
   ui.onView.hidden = !view.enabled
-  ui.enabledSwitch.checked = view.enabled
-  ui.enabledLabel.textContent = view.enabled ? 'Látigo encendido' : 'Látigo apagado'
-  ui.soundSwitch.checked = view.sound
-  ui.soundSwitch.disabled = !view.enabled
+  renderSwitch(view)
+  renderSound(view)
+  renderDesktop(view)
   shownTotal = Math.max(shownTotal, view.stats.total)
   applyLook(shownTotal)
   renderStats(view)
   renderSession(view)
-  renderWhipMode(view)
   scene.reduced = isReduced()
   ui.app.classList.toggle('is-reduced', scene.reduced)
   if (view.enabled && wasOff) layoutCanvas()
@@ -381,19 +384,28 @@ function showBanner(total: number): void {
 function playLash(lash: LashAnimation): void {
   if (state !== null && !state.enabled) return
   shownTotal = Math.max(shownTotal, lash.total)
-  if (lash.sound && state?.sound !== false) sounds.play('crack', state?.volume ?? 0.7)
-  scene.reduced = isReduced()
-  scene.crack({ combo: lash.combo, levelUp: lash.levelUp })
-  showSource(lash)
-  later(CRACK_DURATION * CRACK_AT * 1000, () => {
-    applyLook(shownTotal)
-    if (state !== null) renderStats(state)
-    showCombo(lash)
-    if (lash.levelUp) {
-      showBanner(lash.total)
-      if (lash.sound) sounds.play('level', state?.volume ?? 0.7)
-    }
+  const plan = planLashSound(state?.soundStyle ?? DEFAULT_SOUND_STYLE, Math.random, IMPACT_MS, {
+    lashHasSound: lash.sound,
+    soundOn: state?.sound !== false,
   })
+  if (plan !== null) sounds.play(plan.file.path, volume(), plan.soundDelayMs)
+  const strike = () => {
+    scene.reduced = isReduced()
+    scene.crack({ combo: lash.combo, levelUp: lash.levelUp })
+    showSource(lash)
+    later(IMPACT_MS, () => {
+      applyLook(shownTotal)
+      if (state !== null) renderStats(state)
+      showCombo(lash)
+      if (lash.levelUp) {
+        showBanner(lash.total)
+        if (plan !== null) sounds.play(LEVEL_SOUND, volume())
+      }
+    })
+  }
+  // Si el golpe del archivo llega despues del impacto, la animacion lo espera.
+  if (plan === null || plan.animationDelayMs === 0) strike()
+  else later(plan.animationDelayMs, strike)
   if (lash.source === 'vscode' && lash.target === 'effort' && !lash.reachedSession) {
     showNote('Latigazo contado, pero no llegó a ninguna sesión: abre Claude Code para que el effort suba.')
   }
@@ -428,6 +440,8 @@ function startLoop(): void {
 function receive(message: HostMessage): void {
   if (message.type === 'state') {
     state = message.state
+    // La app ya respondio (abierta o no instalada): el boton deja de esperar.
+    if (pendingOpen !== null && (state.desktop.alive || state.desktop.appMissing)) clearPendingOpen()
     render(message.state)
     startLoop()
     if (demo) draw()
@@ -446,40 +460,49 @@ function lashFromPanel(target: Target): void {
   vscode.postMessage({ type: 'lash', target })
 }
 
-/** Si la app no confirma en este tiempo, el boton vuelve a quedar libre. */
-const PENDING_WHIP_MS = 4000
+/** Si la app no responde en este tiempo, el boton vuelve a quedar libre. */
 const PENDING_OPEN_MS = 10000
-
-function toggleWhipMode(): void {
-  if (state === null || !state.desktop.alive || pendingWhip !== null) return
-  const timer = window.setTimeout(() => {
-    pendingWhip = null
-    if (state !== null) renderWhipMode(state)
-  }, PENDING_WHIP_MS)
-  pendingWhip = { active: !state.desktop.whipMode, timer }
-  renderWhipMode(state)
-  vscode.postMessage({ type: 'toggleWhipMode' })
-}
 
 function openDesktopApp(): void {
   if (state === null || pendingOpen !== null) return
   const timer = window.setTimeout(() => {
     pendingOpen = null
-    if (state !== null) renderWhipMode(state)
+    if (state !== null) renderDesktop(state)
   }, PENDING_OPEN_MS)
   pendingOpen = { timer }
-  renderWhipMode(state)
+  renderDesktop(state)
   vscode.postMessage({ type: 'openDesktopApp' })
+}
+
+/** El estilo del desplegable (el elegido, aunque la extension aun no lo confirme). */
+function selectedStyle(): SoundStyle {
+  const value = ui.soundPicker.value
+  return isSoundStyle(value) ? value : (state?.soundStyle ?? DEFAULT_SOUND_STYLE)
+}
+
+/** Probar (y elegir): suena aunque el sonido este apagado, porque lo pidio la persona. */
+function playTestSound(style: SoundStyle): void {
+  sounds.play(planTestSound(style, Math.random).file.path, volume())
+}
+
+function chooseSoundStyle(): void {
+  const style = selectedStyle()
+  showSoundAbout(style)
+  // Elegir un sonido tambien lo prende, como /latigo sonido <estilo> en Claude Code.
+  ui.soundSwitch.checked = true
+  vscode.postMessage({ type: 'setSoundStyle', style })
+  playTestSound(style)
 }
 
 ui.lashModel.addEventListener('click', () => lashFromPanel('model'))
 ui.lashEffort.addEventListener('click', () => lashFromPanel('effort'))
-ui.whipToggle.addEventListener('click', toggleWhipMode)
 ui.openApp.addEventListener('click', openDesktopApp)
 ui.openAppRetry.addEventListener('click', openDesktopApp)
 ui.installGuide.addEventListener('click', () => vscode.postMessage({ type: 'openInstallGuide' }))
 ui.enabledSwitch.addEventListener('change', () => vscode.postMessage({ type: 'setEnabled', enabled: ui.enabledSwitch.checked }))
 ui.soundSwitch.addEventListener('change', () => vscode.postMessage({ type: 'setSound', sound: ui.soundSwitch.checked }))
+ui.soundPicker.addEventListener('change', chooseSoundStyle)
+ui.soundTest.addEventListener('click', () => playTestSound(selectedStyle()))
 ui.installPlugin.addEventListener('click', () => vscode.postMessage({ type: 'installPlugin' }))
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) startLoop()
@@ -493,7 +516,7 @@ new ResizeObserver(() => {
   draw()
 }).observe(ui.preview)
 
-ui.toggleKey.textContent = toggleKeyLabel()
+ui.toggleKey.textContent = toggleKeyLabel(navigator.platform)
 scene.fontFamily = getComputedStyle(document.body).fontFamily || 'sans-serif'
 function syncTheme(): void {
   scene.additive = !document.body.classList.contains('vscode-light')

@@ -1,6 +1,7 @@
-// La app de escritorio del latigo (macOS): convierte el puntero en un latigo
-// sobre toda la pantalla. La extension solo la abre y le pide prender o apagar
-// el modo latigo por el puente; aqui va lo de abrirla, sin vscode.
+// La app de escritorio del latigo (macOS): con el latigo prendido, convierte el
+// puntero en un latigo sobre toda la pantalla. Sigue el mismo interruptor que
+// la extension (config.json) y avisa su estado en desktop.json; la extension
+// solo la abre. Aqui va lo de abrirla, sin vscode.
 
 import { execFile } from 'node:child_process'
 

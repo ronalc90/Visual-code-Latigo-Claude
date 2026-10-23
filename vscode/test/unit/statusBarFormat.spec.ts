@@ -4,7 +4,7 @@ import { TIERS } from '../../../hooks/levels'
 import { formatStatusBar } from '../../src/statusBarFormat'
 
 describe('formatStatusBar', () => {
-  it('encendido muestra la llama y el nivel', () => {
+  it('prendido muestra la llama y el nivel', () => {
     assert.equal(formatStatusBar(true, 0).text, '$(flame) Látigo · Nv 1')
     assert.equal(formatStatusBar(true, TIERS[4]!.minLashes).text, '$(flame) Látigo · Nv 5')
   })
@@ -20,30 +20,36 @@ describe('formatStatusBar', () => {
     const next = TIERS[1]!
     const content = formatStatusBar(true, 10)
     const lines = content.tooltip.split('\n')
-    assert.equal(lines[0], 'Látigo encendido')
+    assert.equal(lines[0], 'Látigo prendido')
     assert.equal(lines[1], `Nivel 1 · ${tier.name}`)
     assert.equal(lines[2], `${Math.floor((10 / next.minLashes) * 100)} % · faltan ${next.minLashes - 10} latigazos para ${next.name}`)
     assert.equal(lines[3], 'Total: 10 latigazos')
     assert.equal(lines[4], 'Clic para abrir el panel')
   })
 
-  it('con el modo latigo activo lo dice en el texto y en el tooltip', () => {
-    const content = formatStatusBar(true, TIERS[4]!.minLashes, { alive: true, whipMode: true })
-    assert.equal(content.text, '$(zap) Modo látigo · Nv 5')
-    assert.equal(content.tooltip.split('\n')[1], 'Modo látigo en pantalla: activo (Esc para salir)')
+  it('un solo interruptor: el texto es el mismo con o sin la app de escritorio, sin un modo latigo aparte', () => {
+    for (const desktop of [
+      { alive: true, whipMode: true, hotkey: 'ok' as const },
+      { alive: true, whipMode: false, hotkey: 'ocupado' as const },
+      { alive: false, whipMode: false, hotkey: 'ok' as const },
+    ]) {
+      const content = formatStatusBar(true, TIERS[4]!.minLashes, desktop)
+      assert.equal(content.text, '$(flame) Látigo · Nv 5')
+      assert.doesNotMatch(content.tooltip, /Modo látigo/)
+    }
   })
 
-  it('con la app abierta pero el modo apagado, solo el tooltip lo menciona', () => {
-    const content = formatStatusBar(true, 0, { alive: true, whipMode: false })
-    assert.equal(content.text, '$(flame) Látigo · Nv 1')
-    assert.equal(content.tooltip.split('\n')[1], 'Modo látigo en pantalla: apagado')
+  it('con la app abierta y el puntero hecho latigo, el tooltip lo dice', () => {
+    const content = formatStatusBar(true, 0, { alive: true, whipMode: true, hotkey: 'ok' })
+    assert.equal(content.tooltip.split('\n')[1], 'Tu puntero es un látigo (app de escritorio)')
   })
 
-  it('con la app cerrada o el latigo apagado no se habla del modo latigo', () => {
-    assert.doesNotMatch(formatStatusBar(true, 0, { alive: false, whipMode: false }).tooltip, /Modo látigo/)
-    const off = formatStatusBar(false, 0, { alive: true, whipMode: true })
+  it('con la app cerrada, sin el puntero de latigo o con el latigo apagado no se menciona la app', () => {
+    assert.doesNotMatch(formatStatusBar(true, 0, { alive: false, whipMode: false, hotkey: 'ok' }).tooltip, /app de escritorio/)
+    assert.doesNotMatch(formatStatusBar(true, 0, { alive: true, whipMode: false, hotkey: 'ok' }).tooltip, /app de escritorio/)
+    const off = formatStatusBar(false, 0, { alive: true, whipMode: true, hotkey: 'ok' })
     assert.equal(off.text, '$(circle-slash) Látigo · apagado')
-    assert.doesNotMatch(off.tooltip, /Modo látigo/)
+    assert.doesNotMatch(off.tooltip, /app de escritorio/)
   })
 
   it('singular y miles con punto', () => {

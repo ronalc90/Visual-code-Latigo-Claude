@@ -5,13 +5,15 @@
 
 import type { Effort, Stats, Target } from './model'
 import { isEffort, normalizeStats } from './model'
+import type { SoundStyle } from './sounds'
+import { DEFAULT_SOUND_STYLE, isSoundStyle } from './sounds'
 
 export const BRIDGE_DIR_NAME = '.claude-latigo'
 export const BRIDGE_VERSION = 1
 
 export type BridgePaths = {
   dir: string
-  /** Interruptor y preferencias: lo cambian la tecla, el boton y /latigo on|off. */
+  /** El interruptor del latigo y las preferencias de sonido: lo cambian el atajo, los botones y /latigo on|off. */
   config: string
   /** Conteos de latigazos (la tabla y el nivel salen de aqui). */
   stats: string
@@ -21,10 +23,8 @@ export type BridgePaths = {
   lash: string
   /** Lo escribe el mod cada pocos segundos: hay una sesion viva y con que effort. */
   presence: string
-  /** Lo escribe la app de escritorio: esta abierta y si el modo latigo esta activo. */
+  /** Lo escribe la app de escritorio: esta abierta, si el puntero es un latigo y si su atajo funciona. */
   desktop: string
-  /** Pedido de VS Code a la app de escritorio para prender o apagar el modo latigo. */
-  whipMode: string
 }
 
 export function bridgePaths(home: string): BridgePaths {
@@ -37,17 +37,22 @@ export function bridgePaths(home: string): BridgePaths {
     lash: `${dir}/lash.json`,
     presence: `${dir}/presence.json`,
     desktop: `${dir}/desktop.json`,
-    whipMode: `${dir}/whipmode.json`,
   }
 }
 
 export type LatigoConfig = {
-  /** Apagado: no hay banda, no suena y el effort vuelve a ser el de la sesion. */
+  /**
+   * El unico interruptor. Prendido: el puntero es un latigo (con la app de
+   * escritorio abierta), la banda de la consola anda y los latigazos suben el
+   * effort. Apagado: todo normal y el effort vuelve a ser el de la sesion.
+   */
   enabled: boolean
   sound: boolean
+  /** Que sonido usar (ver hooks/sounds.ts). */
+  soundStyle: SoundStyle
 }
 
-export const DEFAULT_CONFIG: LatigoConfig = { enabled: true, sound: true }
+export const DEFAULT_CONFIG: LatigoConfig = { enabled: true, sound: true, soundStyle: DEFAULT_SOUND_STYLE }
 
 export type EffortRequests = {
   /** Sube 1 por cada latigazo al effort dado en VS Code. */
@@ -91,11 +96,12 @@ export function parseConfig(text: string | undefined | null): LatigoConfig {
   return {
     enabled: typeof raw.enabled === 'boolean' ? raw.enabled : DEFAULT_CONFIG.enabled,
     sound: typeof raw.sound === 'boolean' ? raw.sound : DEFAULT_CONFIG.sound,
+    soundStyle: isSoundStyle(raw.soundStyle) ? raw.soundStyle : DEFAULT_CONFIG.soundStyle,
   }
 }
 
 export function serializeConfig(config: LatigoConfig): string {
-  return JSON.stringify({ version: BRIDGE_VERSION, enabled: config.enabled, sound: config.sound }, null, 2) + '\n'
+  return JSON.stringify({ version: BRIDGE_VERSION, enabled: config.enabled, sound: config.sound, soundStyle: config.soundStyle }, null, 2) + '\n'
 }
 
 export function parseStatsFile(text: string | undefined | null): Stats {
@@ -184,16 +190,20 @@ export function isPresenceAlive(presence: Presence | null, now: number): boolean
 /** La app de escritorio se da por abierta si escribio presencia hace menos de esto. */
 export const DESKTOP_TTL_MS = 6_000
 
+/** Si el atajo global de la app funciona: `ocupado` cuando otra app ya lo tiene. */
+export type HotkeyStatus = 'ok' | 'ocupado'
+
 export type DesktopPresence = {
   at: number
-  /** El modo latigo (puntero de latigo en pantalla) esta activo. */
+  /** El puntero es un latigo ahora (la app esta abierta y el latigo prendido). */
   whipMode: boolean
+  hotkey: HotkeyStatus
 }
 
 export function parseDesktopPresence(text: string | undefined | null): DesktopPresence | null {
   const raw = asRecord(parseJson(text))
   if (raw === undefined) return null
-  return { at: finiteNumber(raw.at, 0), whipMode: raw.whipMode === true }
+  return { at: finiteNumber(raw.at, 0), whipMode: raw.whipMode === true, hotkey: raw.hotkey === 'ocupado' ? 'ocupado' : 'ok' }
 }
 
 export function serializeDesktopPresence(presence: DesktopPresence): string {
@@ -202,20 +212,4 @@ export function serializeDesktopPresence(presence: DesktopPresence): string {
 
 export function isDesktopAlive(presence: DesktopPresence | null, now: number): boolean {
   return presence !== null && now - presence.at >= 0 && now - presence.at < DESKTOP_TTL_MS
-}
-
-export type WhipModeRequest = {
-  /** Sube 1 por cada pedido, para que la app note dos pedidos seguidos iguales. */
-  seq: number
-  active: boolean
-}
-
-export function parseWhipModeRequest(text: string | undefined | null): WhipModeRequest | null {
-  const raw = asRecord(parseJson(text))
-  if (raw === undefined || typeof raw.active !== 'boolean') return null
-  return { seq: Math.max(0, Math.floor(finiteNumber(raw.seq, 0))), active: raw.active }
-}
-
-export function serializeWhipModeRequest(request: WhipModeRequest): string {
-  return JSON.stringify({ version: BRIDGE_VERSION, ...request }) + '\n'
 }

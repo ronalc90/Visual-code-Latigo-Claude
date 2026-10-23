@@ -52,8 +52,8 @@ describe('BridgeStore', () => {
     }
 
     it('campos con tipos equivocados caen al valor por defecto campo por campo', () => {
-      writeRaw(bridge.store.paths.config, JSON.stringify({ enabled: false, sound: 'no' }))
-      assert.deepEqual(bridge.store.readConfig(), { enabled: false, sound: true })
+      writeRaw(bridge.store.paths.config, JSON.stringify({ enabled: false, sound: 'no', soundStyle: 'tambor' }))
+      assert.deepEqual(bridge.store.readConfig(), { enabled: false, sound: true, soundStyle: DEFAULT_CONFIG.soundStyle })
       writeRaw(bridge.store.paths.stats, JSON.stringify({ stats: { total: -4, onModel: 'x', onEffort: 3.9, bestCombo: null, byDay: { 'no-es-fecha': 3, '2026-10-22': 2 } } }))
       assert.deepEqual(bridge.store.readStats(), { total: 0, onModel: 0, onEffort: 3, bestCombo: 0, byDay: { '2026-10-22': 2 } })
       writeRaw(bridge.store.paths.effort, JSON.stringify({ seq: -3, at: 'ayer' }))
@@ -68,9 +68,15 @@ describe('BridgeStore', () => {
 
   describe('escrituras', () => {
     it('updateConfig cambia solo lo pedido y conserva lo demas', () => {
-      bridge.store.writeConfig({ enabled: true, sound: false })
-      assert.deepEqual(bridge.store.updateConfig({ enabled: false }), { enabled: false, sound: false })
-      assert.deepEqual(readJson(bridge.store.paths.config), { version: 1, enabled: false, sound: false })
+      bridge.store.writeConfig({ enabled: true, sound: false, soundStyle: 'real-4' })
+      assert.deepEqual(bridge.store.updateConfig({ enabled: false }), { enabled: false, sound: false, soundStyle: 'real-4' })
+      assert.deepEqual(readJson(bridge.store.paths.config), { version: 1, enabled: false, sound: false, soundStyle: 'real-4' })
+    })
+
+    it('el estilo de sonido se guarda sin tocar el interruptor ni el sonido', () => {
+      bridge.store.writeConfig({ enabled: false, sound: false, soundStyle: 'real' })
+      assert.deepEqual(bridge.store.updateConfig({ soundStyle: 'aire' }), { enabled: false, sound: false, soundStyle: 'aire' })
+      assert.equal(bridge.store.readConfig().soundStyle, 'aire')
     })
 
     it('las estadisticas hacen ida y vuelta', () => {
@@ -95,32 +101,17 @@ describe('BridgeStore', () => {
       assert.deepEqual(bridge.store.readLash(), { id: 'x1', at: 10, target: 'effort', combo: 3, total: 7, source: 'vscode' })
     })
 
-    it('requestWhipMode sube el contador en cada pedido y guarda el estado pedido', () => {
-      assert.equal(bridge.store.readWhipModeRequest(), null)
-      assert.deepEqual(bridge.store.requestWhipMode(true), { seq: 1, active: true })
-      assert.deepEqual(bridge.store.requestWhipMode(true), { seq: 2, active: true })
-      assert.deepEqual(bridge.store.requestWhipMode(false), { seq: 3, active: false })
-      assert.deepEqual(readJson(bridge.store.paths.whipMode), { version: 1, seq: 3, active: false })
-    })
-
-    it('requestWhipMode sigue el contador de disco y arranca de cero si el archivo esta roto', () => {
-      writeRaw(bridge.store.paths.whipMode, JSON.stringify({ version: 1, seq: 9, active: true }))
-      assert.equal(bridge.store.requestWhipMode(false).seq, 10)
-      writeRaw(bridge.store.paths.whipMode, 'basura')
-      assert.equal(bridge.store.requestWhipMode(true).seq, 1)
-    })
-
-    it('readDesktop lee la presencia de la app de escritorio', () => {
+    it('readDesktop lee la presencia de la app de escritorio, con el estado de su atajo', () => {
       assert.equal(bridge.store.readDesktop(), null)
-      writeRaw(bridge.store.paths.desktop, JSON.stringify({ version: 1, at: 50, whipMode: true }))
-      assert.deepEqual(bridge.store.readDesktop(), { at: 50, whipMode: true })
-      writeRaw(bridge.store.paths.desktop, JSON.stringify({ at: 60, whipMode: 'si' }))
-      assert.deepEqual(bridge.store.readDesktop(), { at: 60, whipMode: false })
+      writeRaw(bridge.store.paths.desktop, JSON.stringify({ version: 1, at: 50, whipMode: true, hotkey: 'ocupado' }))
+      assert.deepEqual(bridge.store.readDesktop(), { at: 50, whipMode: true, hotkey: 'ocupado' })
+      writeRaw(bridge.store.paths.desktop, JSON.stringify({ at: 60, whipMode: 'si', hotkey: 'quien sabe' }))
+      assert.deepEqual(bridge.store.readDesktop(), { at: 60, whipMode: false, hotkey: 'ok' })
     })
 
     it('la escritura es atomica: no deja temporales y crea la carpeta si la borraron', () => {
       fs.rmSync(bridge.store.paths.dir, { recursive: true, force: true })
-      for (let i = 0; i < 20; i++) bridge.store.writeConfig({ enabled: i % 2 === 0, sound: true })
+      for (let i = 0; i < 20; i++) bridge.store.writeConfig({ ...DEFAULT_CONFIG, enabled: i % 2 === 0 })
       const left = fs.readdirSync(bridge.store.paths.dir)
       assert.deepEqual(left, ['config.json'])
     })
@@ -128,7 +119,7 @@ describe('BridgeStore', () => {
     it('si falla el rename no deja el temporal tirado', () => {
       // Un directorio con el nombre del archivo hace fallar el rename.
       fs.mkdirSync(bridge.store.paths.config)
-      assert.throws(() => bridge.store.writeConfig({ enabled: true, sound: true }))
+      assert.throws(() => bridge.store.writeConfig(DEFAULT_CONFIG))
       const temps = fs.readdirSync(bridge.store.paths.dir).filter(name => name.endsWith('.tmp'))
       assert.deepEqual(temps, [])
     })
@@ -154,7 +145,7 @@ describe('BridgeStore', () => {
       const store = new BridgeStore(bridgePaths('/casa/ronald/'), files)
       store.updateConfig({ sound: false })
       assert.deepEqual([...written.keys()], ['/casa/ronald/.claude-latigo/config.json'])
-      assert.deepEqual(store.readConfig(), { enabled: true, sound: false })
+      assert.deepEqual(store.readConfig(), { ...DEFAULT_CONFIG, sound: false })
     })
   })
 

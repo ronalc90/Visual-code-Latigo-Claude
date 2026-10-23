@@ -6,7 +6,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import type { BridgePaths, DesktopPresence, EffortRequests, LashEvent, LatigoConfig, Presence, WhipModeRequest } from '../../hooks/bridge'
+import type { BridgePaths, DesktopPresence, EffortRequests, LashEvent, LatigoConfig, Presence } from '../../hooks/bridge'
 import {
   parseConfig,
   parseDesktopPresence,
@@ -14,12 +14,10 @@ import {
   parseLashEvent,
   parsePresence,
   parseStatsFile,
-  parseWhipModeRequest,
   serializeConfig,
   serializeEffortRequests,
   serializeLashEvent,
   serializeStats,
-  serializeWhipModeRequest,
 } from '../../hooks/bridge'
 import type { Stats } from '../../hooks/model'
 
@@ -146,19 +144,12 @@ export class BridgeStore {
     return parsePresence(this.files.readText(this.paths.presence))
   }
 
-  /** Lo que escribe la app de escritorio: si esta abierta y si el modo latigo esta activo. */
+  /**
+   * Lo que escribe la app de escritorio: cuando aviso por ultima vez, si el
+   * puntero es un latigo y si su atajo global funciona. Solo se lee: la app
+   * sigue el interruptor de config.json.
+   */
   readDesktop(): DesktopPresence | null {
     return parseDesktopPresence(this.files.readText(this.paths.desktop))
-  }
-
-  readWhipModeRequest(): WhipModeRequest | null {
-    return parseWhipModeRequest(this.files.readText(this.paths.whipMode))
-  }
-
-  /** Le pide a la app de escritorio prender o apagar el modo latigo; cada pedido sube el contador. */
-  requestWhipMode(active: boolean): WhipModeRequest {
-    const next = { seq: (this.readWhipModeRequest()?.seq ?? 0) + 1, active }
-    this.files.writeTextAtomic(this.paths.whipMode, serializeWhipModeRequest(next))
-    return next
   }
 }

@@ -13,7 +13,6 @@ struct BridgeFiles {
     var lash: URL { dir.appendingPathComponent("lash.json") }
     var presence: URL { dir.appendingPathComponent("presence.json") }
     var desktop: URL { dir.appendingPathComponent("desktop.json") }
-    var whipMode: URL { dir.appendingPathComponent("whipmode.json") }
 
     /// La misma regla que el plugin y la extension: LATIGO_HOME, HOME y la carpeta del usuario.
     static func standard(environment: [String: String] = ProcessInfo.processInfo.environment) -> BridgeFiles {
@@ -23,24 +22,38 @@ struct BridgeFiles {
     }
 }
 
+/// El unico interruptor del latigo (en todos lados) y el sonido.
 struct LatigoConfig: Equatable {
     var enabled = true
     var sound = true
+    var soundStyle = "real"
 }
 
 /// Presencia de la sesion de Claude Code (la escribe el plugin cada 3 s).
 struct SessionPresence {
     var at: Double
     var model: String?
+    var effort: Effort?
+    var boost: Effort?
 }
+
+/// Si el atajo global quedo registrado o lo tiene otra app.
+enum HotKeyStatus: String { case ok, ocupado }
 
 final class Bridge {
     static let version = 1
     static let presenceTTL: Double = 15_000
 
     let files: BridgeFiles
+    /// Los estilos de sonido que existen; uno desconocido en config.json da `defaultSoundStyle`.
+    let soundStyles: Set<String>
+    let defaultSoundStyle: String
 
-    init(files: BridgeFiles) { self.files = files }
+    init(files: BridgeFiles, soundStyles: Set<String> = ["real"], defaultSoundStyle: String = "real") {
+        self.files = files
+        self.soundStyles = soundStyles
+        self.defaultSoundStyle = defaultSoundStyle
+    }
 
     // MARK: Lectura
 
@@ -50,8 +63,10 @@ final class Bridge {
     }
 
     func readConfig() -> LatigoConfig {
-        guard let raw = readObject(files.config) else { return LatigoConfig() }
-        return LatigoConfig(enabled: raw["enabled"] as? Bool ?? true, sound: raw["sound"] as? Bool ?? true)
+        guard let raw = readObject(files.config) else { return LatigoConfig(soundStyle: defaultSoundStyle) }
+        let style = raw["soundStyle"] as? String
+        return LatigoConfig(enabled: raw["enabled"] as? Bool ?? true, sound: raw["sound"] as? Bool ?? true,
+                            soundStyle: style.flatMap { soundStyles.contains($0) ? $0 : nil } ?? defaultSoundStyle)
     }
 
     func readStats() -> Stats { Stats.from(json: readObject(files.stats)?["stats"]) }
@@ -63,18 +78,15 @@ final class Bridge {
 
     func readSessionPresence() -> SessionPresence? {
         guard let raw = readObject(files.presence) else { return nil }
-        return SessionPresence(at: (raw["at"] as? NSNumber)?.doubleValue ?? 0, model: raw["model"] as? String)
+        return SessionPresence(at: (raw["at"] as? NSNumber)?.doubleValue ?? 0, model: raw["model"] as? String,
+                               effort: (raw["effort"] as? String).flatMap(Effort.init(rawValue:)),
+                               boost: (raw["boost"] as? String).flatMap(Effort.init(rawValue:)))
     }
 
-    func isSessionAlive(now: Double) -> Bool {
-        guard let presence = readSessionPresence() else { return false }
-        return now - presence.at >= 0 && now - presence.at < Bridge.presenceTTL
-    }
-
-    /// El pedido de VS Code para prender o apagar el modo latigo: (seq, active).
-    func readWhipModeRequest() -> (seq: Int, active: Bool)? {
-        guard let raw = readObject(files.whipMode), let active = raw["active"] as? Bool else { return nil }
-        return (Int((raw["seq"] as? NSNumber)?.doubleValue ?? 0), active)
+    /// La sesion de Claude Code, si esta viva.
+    func liveSession(now: Double) -> SessionPresence? {
+        guard let presence = readSessionPresence(), now - presence.at >= 0, now - presence.at < Bridge.presenceTTL else { return nil }
+        return presence
     }
 
     // MARK: Escritura
@@ -88,11 +100,12 @@ final class Bridge {
     }
 
     func writeConfig(_ config: LatigoConfig) {
-        write(["enabled": config.enabled, "sound": config.sound], to: files.config)
+        write(["enabled": config.enabled, "sound": config.sound, "soundStyle": config.soundStyle], to: files.config)
     }
 
-    func writeDesktopPresence(at: Double, whipMode: Bool) {
-        write(["at": at, "whipMode": whipMode], to: files.desktop)
+    /// `whipMode`: el puntero es un latigo en este momento. `hotkey`: si el atajo funciona.
+    func writeDesktopPresence(at: Double, whipMode: Bool, hotkey: HotKeyStatus) {
+        write(["at": at, "whipMode": whipMode, "hotkey": hotkey.rawValue], to: files.desktop)
     }
 
     /// Cuenta un latigazo de la app: suma en stats.json (junto con lo que ya habia),
@@ -105,7 +118,7 @@ final class Bridge {
         write(["stats": after.json], to: files.stats)
 
         var effortRequested = false
-        if target == .effort && isSessionAlive(now: millis) {
+        if target == .effort && liveSession(now: millis) != nil {
             write(["seq": readEffortSeq() + 1, "at": millis], to: files.effort)
             effortRequested = true
         }

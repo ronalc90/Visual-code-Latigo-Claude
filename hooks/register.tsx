@@ -17,6 +17,8 @@ import {
   serializeStats,
 } from './bridge'
 import { isLevelUp, lookFor, progressFor, sparkRow } from './levels'
+import type { SoundStyle } from './sounds'
+import { DEFAULT_SOUND_STYLE, SOUND_STYLES, crackDelayMs, isSoundStyle, pickSoundFile, soundStyle } from './sounds'
 import type { Effort, Stats, Target } from './model'
 import {
   DEFAULT_EFFORT,
@@ -39,8 +41,6 @@ const FRAME_MS = 70
 const POLL_MS = 600
 const PRESENCE_EVERY_POLLS = 5
 const TWINKLE_MS = 450
-/** Tres chasquidos distintos (scripts/sonidos.py): cada latigazo suena diferente. */
-const CRACK_SOUNDS = ['assets/latigo.wav', 'assets/latigo-2.wav', 'assets/latigo-3.wav']
 const LEVEL_SOUND = 'assets/nivel.wav'
 const STORE_KEY = 'stats'
 
@@ -74,6 +74,10 @@ let reduceMotion = false
 let appliedEffort: Effort | null = null
 /** Un /effort que no se pudo correr en el momento; lo corre el sondeo. */
 let pendingEffort: Effort | null = null
+/** El sonido elegido (config.json); cada latigazo toma un archivo al azar de ese estilo. */
+let soundChoice: SoundStyle = DEFAULT_SOUND_STYLE
+/** Si /latigo y /latigazo ya quedaron registrados en esta sesion. */
+let commandsRegistered = false
 
 function today(now: number): string {
   return dayOf(now, new Date(now).getTimezoneOffset())
@@ -134,6 +138,14 @@ function play($: EngineInterface, asset: string): void {
   $.audio.play({ asset }).catch(() => undefined)
 }
 
+/** Un chasquido del sonido elegido, a tiempo para que el golpe caiga cuando la banda revienta. */
+function playCrack($: EngineInterface): void {
+  const file = pickSoundFile(soundChoice, Math.random())
+  const delay = reduceMotion ? 0 : crackDelayMs(file, IMPACT_FROM * FRAME_MS)
+  if (delay === 0) play($, `assets/${file.path}`)
+  else $.clock.after(delay, () => play($, `assets/${file.path}`))
+}
+
 /**
  * Guarda en config.json solo lo que cambio (`patch`) sobre lo que hay en disco,
  * asi no pisa un cambio que VS Code hizo y este proceso aun no habia leido.
@@ -148,6 +160,7 @@ async function saveConfig($: EngineInterface, patch: Partial<LatigoConfig>): Pro
     await writeText($, paths.config, text)
     if ((await read($, enabled)) !== merged.enabled) await update($, enabled, () => merged.enabled)
     if ((await read($, sound)) !== merged.sound) await update($, sound, () => merged.sound)
+    soundChoice = merged.soundStyle
   } finally {
     isSavingConfig = false
   }
@@ -261,7 +274,10 @@ async function crack($: EngineInterface, target: Target): Promise<CrackResult | 
   await update($, stats, () => after)
   await $.store.set(STORE_KEY, after)
 
-  if (await read($, sound)) play($, leveledUp ? LEVEL_SOUND : CRACK_SOUNDS[Math.floor(Math.random() * CRACK_SOUNDS.length)]!)
+  if (await read($, sound)) {
+    if (leveledUp) play($, LEVEL_SOUND)
+    else playCrack($)
+  }
   if (leveledUp) {
     const { tier } = progressFor(after.total)
     $.ui.toast(`¡Nivel ${tier.level}! Tu látigo ahora es ${tier.name}.`)
@@ -277,6 +293,16 @@ async function crack($: EngineInterface, target: Target): Promise<CrackResult | 
 
   await animate($, { frame: 0, target, combo: hitCombo, raisedTo, isLevelUp: leveledUp })
   return { from, raisedTo, combo: hitCombo, total: after.total, leveledUp }
+}
+
+/** La lista de /latigo sonidos, con el elegido marcado. */
+function soundList(current: SoundStyle, isOn: boolean): string {
+  const lines = ['## Sonidos del látigo', '', '| | Sonido | Cómo suena | Para elegirlo |', '|---|---|---|---|']
+  for (const style of SOUND_STYLES) {
+    lines.push(`| ${style.id === current ? '▶' : ''} | ${style.label} | ${style.description} | \`/latigo sonido ${style.id}\` |`)
+  }
+  lines.push('', isOn ? 'El sonido está prendido (`/latigo sonido off` lo apaga).' : 'El sonido está apagado (`/latigo sonido on` lo prende).')
+  return lines.join('\n')
 }
 
 /** Lo que /latigazo deja escrito en el chat: el latigo y como quedo el effort. */
@@ -315,6 +341,7 @@ async function hydrate($: EngineInterface, isProcessStart: boolean): Promise<voi
     const configText = await readText($, paths.config)
     const config = parseConfig(configText)
     lastConfigText = configText
+    soundChoice = config.soundStyle
     await update($, enabled, () => config.enabled)
     await update($, sound, () => config.sound)
     if (configText === null) await saveConfig($, {})
@@ -335,29 +362,43 @@ async function hydrate($: EngineInterface, isProcessStart: boolean): Promise<voi
   }
   reduceMotion = await readReduceMotion($)
   // Registrar otra vez reemplaza al anterior: asi /latigo sigue tras un /clear.
-  await $.command.register({
-    name: 'latigo',
-    description: 'Tabla del látigo. on | off | calma | sonido | ayuda',
-    argumentHint: '[on|off|calma|sonido|ayuda]',
-  })
-  await $.command.register({
-    name: 'latigazo',
-    description: 'Latigazo al effort: lo sube un nivel (también en el selector de modelo)',
-  })
+  commandsRegistered = await registerCommands($)
   await update($, ready, () => true)
+}
+
+/**
+ * Registra /latigo y /latigazo. Si Claude Code lo rechaza (pasa si el plugin se
+ * carga a mitad de una sesion), el latigo sigue andando y el sondeo reintenta.
+ */
+async function registerCommands($: EngineInterface): Promise<boolean> {
+  try {
+    await $.command.register({
+      name: 'latigo',
+      description: 'Tabla del látigo. on | off | calma | sonido | sonidos | ayuda',
+      argumentHint: '[on|off|calma|sonido|sonidos|ayuda]',
+    })
+    await $.command.register({
+      name: 'latigazo',
+      description: 'Latigazo al effort: lo sube un nivel',
+    })
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** Lee el puente: interruptor, latigazos al effort y latigazos dados en VS Code. */
 async function poll($: EngineInterface): Promise<void> {
   // Red de seguridad: si la sesion quedo en blanco (un /clear), se vuelve a cargar.
-  if (!(await read($, ready))) await hydrate($, false)
+  if (!(await read($, ready))) await hydrate($, false).catch(() => undefined)
   if (pendingEffort !== null) {
     const level = pendingEffort
     pendingEffort = null
     if (appliedEffort === level) await $.command.run({ command: 'effort', args: level }).catch(() => undefined)
   }
-  if (paths === null) return
   polls += 1
+  if (!commandsRegistered && polls % 10 === 0) commandsRegistered = await registerCommands($)
+  if (paths === null) return
 
   // Solo cuenta un config.json que cambio por fuera. Si este proceso escribio
   // mientras se leia, lo leido ya es viejo y se ignora.
@@ -366,6 +407,7 @@ async function poll($: EngineInterface): Promise<void> {
   if (configText !== null && configText !== knownConfig && lastConfigText === knownConfig && !isSavingConfig) {
     lastConfigText = configText
     const config = parseConfig(configText)
+    soundChoice = config.soundStyle
     if ((await read($, enabled)) !== config.enabled) await setEnabled($, config.enabled, false)
     if ((await read($, sound)) !== config.sound) await update($, sound, () => config.sound)
   }
@@ -404,7 +446,11 @@ async function poll($: EngineInterface): Promise<void> {
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await hydrate($, true)
+    try {
+      await hydrate($, true)
+    } catch {
+      // Lo que no se pudo cargar lo vuelve a intentar el sondeo (ready sigue en false).
+    }
 
     poller?.cancel()
     poller = $.clock.every(POLL_MS, () => void poll($))
@@ -428,7 +474,7 @@ export const register: Register = on => {
     const result = await next(e)
     if (e.reason === 'clear') {
       // El proceso sigue con una sesion nueva y su estado en blanco: se recarga enseguida.
-      $.clock.after(1, () => void hydrate($, false))
+      $.clock.after(1, () => void hydrate($, false).catch(() => undefined))
     }
     return result
   })
@@ -454,11 +500,21 @@ export const register: Register = on => {
       await writePresence($)
       return { text: 'Calma: el effort vuelve a ser el de la sesión.' }
     }
-    if (arg === 'sonido') {
-      const isOn = !(await read($, sound))
+    if (arg === 'sonidos') return { text: soundList(soundChoice, await read($, sound)) }
+    if (arg === 'sonido' || arg === 'sonido on' || arg === 'sonido off') {
+      const isOn = arg === 'sonido' ? !(await read($, sound)) : arg === 'sonido on'
       await update($, sound, () => isOn)
       await saveConfig($, { sound: isOn })
       return { text: isOn ? 'Sonido encendido.' : 'Sonido apagado.' }
+    }
+    if (arg.startsWith('sonido ')) {
+      const choice = arg.slice('sonido '.length).trim()
+      if (!isSoundStyle(choice)) return { text: `No conozco el sonido «${choice}».\n\n${soundList(soundChoice, await read($, sound))}` }
+      soundChoice = choice
+      await update($, sound, () => true)
+      await saveConfig($, { sound: true, soundStyle: choice })
+      if (await read($, enabled)) play($, `assets/${pickSoundFile(choice, Math.random()).path}`)
+      return { text: `Sonido: ${soundStyle(choice).label}.` }
     }
     if (arg === 'ayuda' || arg === 'help') return { text: HELP_TEXT }
     const now = await $.clock.now()
