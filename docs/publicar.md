@@ -34,23 +34,30 @@ Quien ya lo tenga recibe la versión nueva con `/plugin` → *Marketplaces* → 
 
 ### Una sola vez: crear el publicador
 
-1. Entra a <https://marketplace.visualstudio.com/manage> con una cuenta de Microsoft y crea el publicador **`ronalc90`**. Tiene que ser exactamente el `publisher` de `vscode/package.json`.
-2. En Azure DevOps (<https://dev.azure.com>), crea un *Personal Access Token*:
-   - **Organization:** *All accessible organizations*
-   - **Scopes:** *Custom defined* → **Marketplace → Manage**
-3. Guarda el token en un gestor de contraseñas. Nunca va en el repositorio.
+Entra a <https://marketplace.visualstudio.com/manage> con tu cuenta de Microsoft y crea el publicador con el ID **`ronalc90`**:
 
-### Cada versión
+- Tiene que ser exactamente el `publisher` de `vscode/package.json`.
+- El ID no se puede cambiar después.
 
-```
-cd vscode
-npm ci --include=dev
-npm run package                      # genera latigo-claude-<versión>.vsix con los enlaces a GitHub
-npx vsce login ronalc90              # pide el token la primera vez
-npx vsce publish --packagePath latigo-claude-0.2.0.vsix
-```
+### Cada versión: subir el `.vsix` (sin token)
 
-`npm run package` le pasa a `vsce` las rutas de GitHub (`--baseContentUrl` y `--baseImagesUrl`) para que las imágenes del README se vean en la página del Marketplace. Publicar ese mismo `.vsix` con `--packagePath` conserva esas rutas.
+1. Genera el paquete:
+
+   ```
+   cd vscode && npm ci --include=dev && npm run package
+   ```
+
+   Sale `latigo-claude-<versión>.vsix`, con los enlaces de las imágenes apuntando a GitHub. También sirve el `.vsix` adjunto a la versión de GitHub.
+2. En <https://marketplace.visualstudio.com/manage>:
+   - La primera vez: **New extension** → **Visual Studio Code** y sube el archivo.
+   - En las versiones siguientes: **Update** sobre la extensión.
+3. El Marketplace lo revisa (incluye un análisis de virus) y en unos minutos aparece en el buscador de extensiones de VS Code.
+
+### Por consola (opcional)
+
+`npx vsce publish` necesita un *Personal Access Token* de Azure DevOps con el alcance **Marketplace → Manage**.
+
+**Ojo:** los tokens globales (*All accessible organizations*), que eran los que pedía `vsce`, **dejan de funcionar el 1 de diciembre de 2026**. Microsoft recomienda Microsoft Entra ID para publicar de forma automática. Mientras no haga falta automatizar, subir el `.vsix` a mano es lo más simple.
 
 ### Open VSX (Cursor, VSCodium y otros)
 
@@ -82,4 +89,4 @@ gh release create v0.2.0 vscode/latigo-claude-0.2.0.vsix --title "v0.2.0" --note
 | README con imágenes por HTTPS | lo resuelve `npm run package` | listo |
 | Sin imágenes SVG en el README | solo PNG | listo |
 | `.vsix` sin archivos de más | `npx vsce ls`: 11 archivos | listo |
-| Publicador creado y token | Marketplace y Azure DevOps | **pendiente: lo hace Ronald** |
+| Publicador creado y `.vsix` subido | marketplace.visualstudio.com/manage | **pendiente: lo hace Ronald** |
