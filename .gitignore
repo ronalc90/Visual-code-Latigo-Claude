@@ -1,0 +1,10 @@
+# Configuracion local de Claude
+.claude/
+CLAUDE.md
+memory/
+
+# Tipos que genera el motor al cargar el mod
+.claude-plugin/types/
+
+node_modules/
+.DS_Store

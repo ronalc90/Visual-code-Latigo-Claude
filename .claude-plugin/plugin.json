@@ -1,0 +1,9 @@
+{
+  "name": "latigo",
+  "version": "0.1.0",
+  "description": "Un latigo para Claude Code: latigazos con sonido, combos x2 x3 y, si le das al effort, lo sube.",
+  "author": { "name": "Ronald Cipagauta", "url": "https://github.com/ronalc90" },
+  "homepage": "https://github.com/ronalc90/Visual-code-Latigo-Claude",
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}
