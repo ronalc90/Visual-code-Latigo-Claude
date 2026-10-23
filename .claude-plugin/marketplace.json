@@ -1,6 +1,6 @@
 {
   "name": "visual-code-latigo-claude",
-  "description": "El latigo para Claude Code: latigazos con sonido, combos y effort al maximo.",
+  "description": "El látigo para Claude Code: latigazos con sonido, combos, niveles dorados y effort al máximo.",
   "owner": {
     "name": "Ronald Cipagauta",
     "url": "https://github.com/ronalc90"
@@ -9,7 +9,8 @@
     {
       "name": "latigo",
       "source": "./",
-      "description": "Un latigo para Claude Code: latigazos con sonido, combos x2 x3 y, si le das al effort, lo sube."
+      "description": "Un látigo para Claude Code: latigazos con sonido, combos, 14 niveles que se doran poco a poco y, si le das al effort, lo sube.",
+      "version": "0.2.0"
     }
   ]
 }
