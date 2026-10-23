@@ -9,9 +9,10 @@ import * as path from 'node:path'
 import type { BridgePaths } from '../../hooks/bridge'
 import type { Disposable } from './events'
 
-export type BridgeFile = 'config' | 'stats' | 'effort' | 'lash' | 'presence'
+/** Los archivos que se vigilan; whipmode.json no, porque lo escribe la propia extension. */
+export type BridgeFile = 'config' | 'stats' | 'effort' | 'lash' | 'presence' | 'desktop'
 
-export const BRIDGE_FILES: readonly BridgeFile[] = ['config', 'stats', 'effort', 'lash', 'presence']
+export const BRIDGE_FILES: readonly BridgeFile[] = ['config', 'stats', 'effort', 'lash', 'presence', 'desktop']
 
 export type WatcherOptions = {
   debounceMs?: number

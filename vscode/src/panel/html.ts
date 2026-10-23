@@ -88,44 +88,73 @@ export function renderPanelHtml(options: PanelHtmlOptions): string {
     <div class="off-text">
       <h2>El látigo está guardado</h2>
       <p>No suena, no anima y el effort de Claude Code vuelve a ser el de la sesión. Tus latigazos y tu nivel siguen guardados.</p>
-      <p class="off-hint">Préndelo con el interruptor de arriba o con <kbd id="toggle-key">Ctrl+Cmd+L</kbd>.</p>
+      <p class="off-hint">Préndelo con el interruptor de arriba o con <kbd id="toggle-key">Shift+Alt+L</kbd>.</p>
     </div>
   </section>
 
   <main class="layout" id="on-view">
-    <section class="stage" id="stage" aria-label="Látigo">
-      <canvas id="whip-canvas" aria-hidden="true"></canvas>
-      <p class="stage-caption" id="stage-caption">Dale clic al modelo o al effort</p>
-      <div class="targets">
-        <button type="button" class="target target-model" id="target-model" title="Latigazo al modelo: solo para desahogarse">
-          <span class="target-kicker">Modelo</span>
-          <span class="target-value" id="model-name">Claude</span>
-          <span class="target-note">solo visual</span>
-        </button>
-        <button type="button" class="target target-effort" id="target-effort" title="Latigazo al effort: lo sube un nivel">
-          <span class="target-kicker">Effort</span>
-          <span class="target-value" id="effort-value">—</span>
-          <span class="target-note" id="effort-note">un latigazo lo sube</span>
-        </button>
+    <section class="card whip-card" id="whip-card" aria-labelledby="whip-title">
+      <div class="card-head">
+        <h2 class="card-title" id="whip-title">Modo látigo en pantalla</h2>
+        <span class="pill" id="whip-pill">App cerrada</span>
       </div>
-      <div class="session-hint" id="session-hint" hidden>
-        <span>Abre Claude Code para que el effort suba</span>
-        <button type="button" class="link-button" id="install-plugin">¿No tienes el plugin?</button>
+      <div class="whip-ready" id="whip-ready" hidden>
+        <button type="button" class="whip-button" id="whip-toggle">
+          <span class="whip-button-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3.5 10.6 20l2.3-6.6 6.6-2.3z" stroke-width="1.8"/><path d="M13.6 13.6 20.5 20.5" stroke-width="1.8"/><path d="M18.5 3.5v3M17 5h3" stroke-width="1.4"/></svg></span>
+          <span id="whip-toggle-label">Activar modo látigo</span>
+        </button>
+        <p class="hint">Atajo: <kbd>Ctrl+Cmd+L</kbd> · <kbd>Esc</kbd> para salir</p>
       </div>
-      <div class="combo" id="combo" aria-live="polite"></div>
-      <div class="banner" id="banner" aria-live="polite"></div>
-      <div class="toast" id="toast" role="status"></div>
+      <div class="whip-closed" id="whip-closed" hidden>
+        <p class="whip-status">La app de escritorio no está abierta</p>
+        <button type="button" class="button button-primary" id="open-app">Abrir la app</button>
+      </div>
+      <div class="whip-missing" id="whip-missing" hidden>
+        <p class="whip-status is-warn">No se encontró la app «Látigo» en este Mac.</p>
+        <div class="button-row">
+          <button type="button" class="button button-primary" id="install-guide">Cómo instalarla</button>
+          <button type="button" class="button" id="open-app-retry">Reintentar</button>
+        </div>
+      </div>
+      <p class="whip-status" id="whip-unsupported" hidden>Disponible por ahora solo en Mac</p>
+      <p class="whip-explain" id="whip-explain">La app de escritorio convierte tu puntero en un látigo: cada clic sobre una conversación de Claude le sube el effort.</p>
     </section>
 
-    <section class="card level-card" aria-label="Nivel">
+    <section class="card session-card" aria-labelledby="session-title">
+      <div class="card-head">
+        <h2 class="card-title" id="session-title">Sesión de Claude Code</h2>
+        <span class="pill" id="session-pill">Sin sesión</span>
+      </div>
+      <dl class="session-facts">
+        <div><dt>Modelo</dt><dd id="model-name">—</dd></div>
+        <div><dt>Effort</dt><dd class="effort-value" id="effort-value">sin sesión</dd></div>
+      </dl>
+      <div class="session-hint" id="session-hint" hidden>
+        <span>Abre Claude Code para que el effort suba.</span>
+        <button type="button" class="link-button" id="install-plugin">¿No tienes el plugin?</button>
+      </div>
+      <div class="button-row session-actions">
+        <button type="button" class="button" id="lash-effort" title="Latigazo al effort: lo sube un nivel en la sesión abierta">Latigazo al effort</button>
+        <button type="button" class="button" id="lash-model" title="Latigazo al modelo: solo para desahogarse, no cambia nada">Al modelo</button>
+      </div>
+      <p class="session-note" id="session-note" role="status"></p>
+    </section>
+
+    <section class="card level-card" aria-labelledby="tier-name">
+      <div class="preview" id="preview">
+        <canvas id="whip-canvas" aria-hidden="true"></canvas>
+        <div class="combo" id="combo" aria-live="polite"></div>
+        <div class="banner" id="banner" aria-live="polite"></div>
+        <span class="source-chip" id="source-chip"></span>
+      </div>
       <div class="level-head">
         <span class="level-badge" id="level-badge">1</span>
-        <div>
+        <div class="level-text">
           <p class="eyebrow" id="level-number">Nivel 1 de 14</p>
           <h2 class="tier-name" id="tier-name">Cuero crudo</h2>
         </div>
       </div>
-      <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="level-progress">
+      <div class="progress" role="progressbar" aria-label="Progreso al siguiente nivel" aria-valuemin="0" aria-valuemax="100" id="level-progress">
         <span class="progress-fill" id="progress-fill"></span>
       </div>
       <p class="level-remaining" id="level-remaining">faltan 25 latigazos para Cuero curtido</p>
@@ -134,18 +163,18 @@ export function renderPanelHtml(options: PanelHtmlOptions): string {
     <section class="card stats-card" aria-label="Estadísticas">
       <h2 class="card-title">Tus latigazos</h2>
       <dl class="stats-grid">
-        <div><dt>Total</dt><dd id="stat-total">0</dd></div>
+        <div class="stat-total"><dt>Total</dt><dd id="stat-total">0</dd></div>
         <div><dt>Hoy</dt><dd id="stat-today">0</dd></div>
+        <div><dt>Mejor combo</dt><dd id="stat-combo">—</dd></div>
         <div><dt>Al effort</dt><dd id="stat-effort">0</dd></div>
         <div><dt>Al modelo</dt><dd id="stat-model">0</dd></div>
-        <div><dt>Mejor combo</dt><dd id="stat-combo">—</dd></div>
       </dl>
       <h3 class="subtitle-small">Tus mejores días</h3>
       <ol class="top-days" id="top-days"></ol>
     </section>
 
     <section class="card global-card is-disabled" aria-disabled="true" aria-label="Top global (próximamente)">
-      <div class="global-head">
+      <div class="card-head">
         <h2 class="card-title">Top global</h2>
         <span class="soon-badge">Próximamente</span>
       </div>

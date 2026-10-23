@@ -95,6 +95,29 @@ describe('BridgeStore', () => {
       assert.deepEqual(bridge.store.readLash(), { id: 'x1', at: 10, target: 'effort', combo: 3, total: 7, source: 'vscode' })
     })
 
+    it('requestWhipMode sube el contador en cada pedido y guarda el estado pedido', () => {
+      assert.equal(bridge.store.readWhipModeRequest(), null)
+      assert.deepEqual(bridge.store.requestWhipMode(true), { seq: 1, active: true })
+      assert.deepEqual(bridge.store.requestWhipMode(true), { seq: 2, active: true })
+      assert.deepEqual(bridge.store.requestWhipMode(false), { seq: 3, active: false })
+      assert.deepEqual(readJson(bridge.store.paths.whipMode), { version: 1, seq: 3, active: false })
+    })
+
+    it('requestWhipMode sigue el contador de disco y arranca de cero si el archivo esta roto', () => {
+      writeRaw(bridge.store.paths.whipMode, JSON.stringify({ version: 1, seq: 9, active: true }))
+      assert.equal(bridge.store.requestWhipMode(false).seq, 10)
+      writeRaw(bridge.store.paths.whipMode, 'basura')
+      assert.equal(bridge.store.requestWhipMode(true).seq, 1)
+    })
+
+    it('readDesktop lee la presencia de la app de escritorio', () => {
+      assert.equal(bridge.store.readDesktop(), null)
+      writeRaw(bridge.store.paths.desktop, JSON.stringify({ version: 1, at: 50, whipMode: true }))
+      assert.deepEqual(bridge.store.readDesktop(), { at: 50, whipMode: true })
+      writeRaw(bridge.store.paths.desktop, JSON.stringify({ at: 60, whipMode: 'si' }))
+      assert.deepEqual(bridge.store.readDesktop(), { at: 60, whipMode: false })
+    })
+
     it('la escritura es atomica: no deja temporales y crea la carpeta si la borraron', () => {
       fs.rmSync(bridge.store.paths.dir, { recursive: true, force: true })
       for (let i = 0; i < 20; i++) bridge.store.writeConfig({ enabled: i % 2 === 0, sound: true })

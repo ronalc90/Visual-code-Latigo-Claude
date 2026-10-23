@@ -1,16 +1,17 @@
-// El panel del latigo: pinta el estado que manda la extension, anima los
-// latigazos y le avisa a la extension de los clics. No toca disco ni red.
+// El panel del latigo en la barra lateral: estadisticas y controles. Pinta el
+// estado que manda la extension, anima en la vista previa los latigazos que
+// llegan (de VS Code, de la terminal o del latigo en pantalla) y le avisa a la
+// extension de los clics. No toca disco ni red.
 
 import './style.css'
 
-import { MAX_LEVEL, lookFor, progressFor } from '../../hooks/levels'
-import { seededRandom } from '../../hooks/levels'
+import { MAX_LEVEL, lookFor, progressFor, seededRandom } from '../../hooks/levels'
 import type { Target } from '../../hooks/model'
 import { effectiveEffort, isForcing } from '../../hooks/model'
 import { formatCount, formatDay, plural } from '../src/format'
 import type { HostMessage, LashAnimation, ViewState, WebviewMessage } from '../src/protocol'
 import { SoundPlayer } from './sound'
-import { CRACK_AT, STRIKE_DURATION, WhipScene } from './whip'
+import { CRACK_AT, CRACK_DURATION, WhipPreview } from './whipPreview'
 
 type VsCodeApi = { postMessage(message: WebviewMessage): void }
 
@@ -43,19 +44,31 @@ const ui = {
   enabledLabel: byId<HTMLSpanElement>('enabled-label'),
   soundSwitch: byId<HTMLInputElement>('sound-switch'),
   toggleKey: byId<HTMLElement>('toggle-key'),
-  stage: byId<HTMLElement>('stage'),
-  canvas: byId<HTMLCanvasElement>('whip-canvas'),
-  targetModel: byId<HTMLButtonElement>('target-model'),
-  targetEffort: byId<HTMLButtonElement>('target-effort'),
-  modelName: byId<HTMLSpanElement>('model-name'),
-  effortValue: byId<HTMLSpanElement>('effort-value'),
-  effortNote: byId<HTMLSpanElement>('effort-note'),
+  whipCard: byId<HTMLElement>('whip-card'),
+  whipPill: byId<HTMLElement>('whip-pill'),
+  whipReady: byId<HTMLElement>('whip-ready'),
+  whipToggle: byId<HTMLButtonElement>('whip-toggle'),
+  whipToggleLabel: byId<HTMLElement>('whip-toggle-label'),
+  whipClosed: byId<HTMLElement>('whip-closed'),
+  whipMissing: byId<HTMLElement>('whip-missing'),
+  whipUnsupported: byId<HTMLElement>('whip-unsupported'),
+  whipExplain: byId<HTMLElement>('whip-explain'),
+  openApp: byId<HTMLButtonElement>('open-app'),
+  openAppRetry: byId<HTMLButtonElement>('open-app-retry'),
+  installGuide: byId<HTMLButtonElement>('install-guide'),
+  sessionPill: byId<HTMLElement>('session-pill'),
+  modelName: byId<HTMLElement>('model-name'),
+  effortValue: byId<HTMLElement>('effort-value'),
   sessionHint: byId<HTMLElement>('session-hint'),
-  stageCaption: byId<HTMLElement>('stage-caption'),
   installPlugin: byId<HTMLButtonElement>('install-plugin'),
+  lashEffort: byId<HTMLButtonElement>('lash-effort'),
+  lashModel: byId<HTMLButtonElement>('lash-model'),
+  sessionNote: byId<HTMLElement>('session-note'),
+  preview: byId<HTMLElement>('preview'),
+  canvas: byId<HTMLCanvasElement>('whip-canvas'),
   combo: byId<HTMLElement>('combo'),
   banner: byId<HTMLElement>('banner'),
-  toast: byId<HTMLElement>('toast'),
+  sourceChip: byId<HTMLElement>('source-chip'),
   levelBadge: byId<HTMLElement>('level-badge'),
   levelNumber: byId<HTMLElement>('level-number'),
   tierName: byId<HTMLElement>('tier-name'),
@@ -71,7 +84,7 @@ const ui = {
 }
 
 const random = demo ? seededRandom(Number(params.get('seed') ?? 7)) : seededRandom(Date.now() >>> 0)
-const scene = new WhipScene(random)
+const scene = new WhipPreview(random)
 const sounds = demo
   ? new SoundPlayer({ crack: undefined, level: undefined })
   : new SoundPlayer({ crack: document.body.dataset.crackSound, level: document.body.dataset.levelSound })
@@ -118,11 +131,6 @@ function layoutCanvas(): void {
   ui.canvas.width = Math.max(1, Math.round(rect.width * ratio))
   ui.canvas.height = Math.max(1, Math.round(rect.height * ratio))
   scene.resize(rect.width, rect.height)
-  const targetPoint = (button: HTMLElement) => {
-    const box = button.getBoundingClientRect()
-    return { x: box.left - rect.left - 6, y: box.top - rect.top + box.height / 2 }
-  }
-  scene.setTargets({ model: targetPoint(ui.targetModel), effort: targetPoint(ui.targetEffort) })
 }
 
 function draw(): void {
@@ -140,7 +148,14 @@ function shortModel(name: string): string {
 
 function toggleKeyLabel(): string {
   const platform = navigator.platform.toLowerCase()
-  return platform.includes('mac') ? 'Ctrl+Cmd+L' : 'Shift+Alt+L'
+  return platform.includes('mac') ? 'Shift+Option+L' : 'Shift+Alt+L'
+}
+
+type PillTone = 'live' | 'hot' | 'idle' | 'warn'
+
+function setPill(pill: HTMLElement, text: string, tone: PillTone): void {
+  pill.textContent = text
+  pill.className = `pill pill-${tone}`
 }
 
 function applyLook(total: number): void {
@@ -202,21 +217,79 @@ function renderStats(view: ViewState): void {
 
 function renderSession(view: ViewState): void {
   const session = view.session
-  ui.modelName.textContent = session.alive && session.model !== null ? shortModel(session.model) : 'Claude'
+  ui.modelName.textContent = session.alive && session.model !== null ? shortModel(session.model) : '—'
   if (session.alive) {
     const effective = effectiveEffort(session.effort, session.boost)
-    ui.effortValue.textContent = effective === null ? '—' : `${effective}${isForcing(session.effort, session.boost) ? ' ⚡' : ''}`
-    ui.effortNote.textContent = effective === 'max' ? 'ya está en max' : 'un latigazo lo sube'
-    ui.targetEffort.classList.remove('is-offline')
+    const forcing = isForcing(session.effort, session.boost)
+    ui.effortValue.textContent = effective === null ? '—' : `${effective}${forcing ? ' ⚡' : ''}`
+    ui.effortValue.title = forcing ? 'El látigo está subiendo el effort de la sesión' : ''
+    ui.effortValue.classList.remove('is-offline')
+    setPill(ui.sessionPill, 'En vivo', 'live')
     ui.sessionHint.hidden = true
-    ui.stageCaption.hidden = false
   } else {
     ui.effortValue.textContent = 'sin sesión'
-    ui.effortNote.textContent = 'cuenta, pero no sube'
-    ui.targetEffort.classList.add('is-offline')
+    ui.effortValue.title = ''
+    ui.effortValue.classList.add('is-offline')
+    setPill(ui.sessionPill, 'Sin sesión', 'idle')
     ui.sessionHint.hidden = false
-    ui.stageCaption.hidden = true
   }
+}
+
+// --- Modo latigo en pantalla ---
+
+/** Lo pedido con un boton que la app todavia no confirma: mientras tanto el boton espera. */
+let pendingWhip: { active: boolean; timer: number } | null = null
+let pendingOpen: { timer: number } | null = null
+
+function clearPendingWhip(): void {
+  if (pendingWhip !== null) window.clearTimeout(pendingWhip.timer)
+  pendingWhip = null
+}
+
+function clearPendingOpen(): void {
+  if (pendingOpen !== null) window.clearTimeout(pendingOpen.timer)
+  pendingOpen = null
+}
+
+function whipButtonLabel(whipMode: boolean): string {
+  if (pendingWhip !== null) return pendingWhip.active ? 'Activando…' : 'Apagando…'
+  return whipMode ? 'Apagar modo látigo' : 'Activar modo látigo'
+}
+
+function whipExplanation(ready: boolean, whipMode: boolean): string {
+  if (ready && whipMode) return 'Tu puntero es un látigo: cada clic sobre una conversación de Claude le sube el effort.'
+  if (ready) return 'Convierte tu puntero en un látigo sobre toda la pantalla.'
+  return 'La app de escritorio convierte tu puntero en un látigo: cada clic sobre una conversación de Claude le sube el effort.'
+}
+
+function renderWhipMode(view: ViewState): void {
+  const desktop = view.desktop
+  if (pendingWhip !== null && (!desktop.alive || desktop.whipMode === pendingWhip.active)) clearPendingWhip()
+  if (pendingOpen !== null && (desktop.alive || desktop.appMissing)) clearPendingOpen()
+
+  const ready = desktop.supported && desktop.alive
+  const missing = desktop.supported && !desktop.alive && desktop.appMissing
+  const closed = desktop.supported && !desktop.alive && !desktop.appMissing
+  ui.whipReady.hidden = !ready
+  ui.whipClosed.hidden = !closed
+  ui.whipMissing.hidden = !missing
+  ui.whipUnsupported.hidden = desktop.supported
+  ui.whipCard.classList.toggle('is-active', ready && desktop.whipMode)
+
+  if (!desktop.supported) setPill(ui.whipPill, 'Solo Mac', 'idle')
+  else if (missing) setPill(ui.whipPill, 'No instalada', 'warn')
+  else if (closed) setPill(ui.whipPill, 'App cerrada', 'idle')
+  else if (desktop.whipMode) setPill(ui.whipPill, 'Activo', 'hot')
+  else setPill(ui.whipPill, 'Listo', 'live')
+
+  ui.whipToggle.disabled = pendingWhip !== null
+  ui.whipToggle.classList.toggle('is-on', desktop.whipMode)
+  ui.whipToggle.setAttribute('aria-pressed', String(desktop.whipMode))
+  ui.whipToggleLabel.textContent = whipButtonLabel(desktop.whipMode)
+  ui.openApp.disabled = pendingOpen !== null
+  ui.openApp.textContent = pendingOpen !== null ? 'Abriendo…' : 'Abrir la app'
+  ui.openAppRetry.disabled = pendingOpen !== null
+  ui.whipExplain.textContent = whipExplanation(ready, desktop.whipMode)
 }
 
 function render(view: ViewState): void {
@@ -234,6 +307,7 @@ function render(view: ViewState): void {
   applyLook(shownTotal)
   renderStats(view)
   renderSession(view)
+  renderWhipMode(view)
   scene.reduced = isReduced()
   ui.app.classList.toggle('is-reduced', scene.reduced)
   if (view.enabled && wasOff) layoutCanvas()
@@ -262,12 +336,29 @@ function showCombo(lash: LashAnimation): void {
   })
 }
 
-function showToast(text: string, kind: 'info' | 'warn' = 'info', ms = 3200): void {
-  ui.toast.textContent = text
-  ui.toast.className = `toast is-visible toast-${kind}`
-  const shown = text
+const SOURCE_LABELS: Record<LashAnimation['source'], string> = {
+  vscode: '',
+  terminal: 'desde la terminal',
+  desktop: 'desde la pantalla',
+}
+
+function showSource(lash: LashAnimation): void {
+  const text = SOURCE_LABELS[lash.source]
+  if (text === '') return
+  ui.sourceChip.textContent = text
+  ui.sourceChip.className = 'source-chip is-visible'
+  const shown = lash.id
+  ui.sourceChip.dataset.lash = shown
+  later(1800, () => {
+    if (ui.sourceChip.dataset.lash === shown) ui.sourceChip.className = 'source-chip'
+  })
+}
+
+function showNote(text: string, ms = 4200): void {
+  ui.sessionNote.textContent = text
+  ui.sessionNote.className = 'session-note is-visible'
   later(ms, () => {
-    if (ui.toast.textContent === shown) ui.toast.className = 'toast'
+    if (ui.sessionNote.textContent === text) ui.sessionNote.className = 'session-note'
   })
 }
 
@@ -279,21 +370,12 @@ function showBanner(total: number): void {
   kicker.textContent = '¡Subiste de nivel!'
   const title = document.createElement('span')
   title.className = 'banner-title'
-  title.textContent = `¡Nivel ${tier.level} · ${tier.name}!`
+  title.textContent = `Nivel ${tier.level} · ${tier.name}`
   ui.banner.append(kicker, title)
   ui.banner.className = 'banner is-visible'
-  later(2800, () => {
+  later(2600, () => {
     ui.banner.className = 'banner'
   })
-}
-
-function hitTarget(target: Target): void {
-  const button = target === 'effort' ? ui.targetEffort : ui.targetModel
-  button.classList.remove('is-hit')
-  // Forzar reflow para reiniciar la animacion CSS.
-  void button.offsetWidth
-  button.classList.add('is-hit')
-  later(420, () => button.classList.remove('is-hit'))
 }
 
 function playLash(lash: LashAnimation): void {
@@ -301,10 +383,9 @@ function playLash(lash: LashAnimation): void {
   shownTotal = Math.max(shownTotal, lash.total)
   if (lash.sound && state?.sound !== false) sounds.play('crack', state?.volume ?? 0.7)
   scene.reduced = isReduced()
-  scene.lash(lash.target, { combo: lash.combo, levelUp: lash.levelUp })
-  const crackMs = STRIKE_DURATION * CRACK_AT * 1000
-  later(crackMs, () => {
-    hitTarget(lash.target)
+  scene.crack({ combo: lash.combo, levelUp: lash.levelUp })
+  showSource(lash)
+  later(CRACK_DURATION * CRACK_AT * 1000, () => {
     applyLook(shownTotal)
     if (state !== null) renderStats(state)
     showCombo(lash)
@@ -313,9 +394,8 @@ function playLash(lash: LashAnimation): void {
       if (lash.sound) sounds.play('level', state?.volume ?? 0.7)
     }
   })
-  if (lash.source === 'terminal') showToast('Latigazo desde Claude Code')
-  else if (lash.target === 'effort' && !lash.reachedSession) {
-    showToast('Latigazo contado, pero no llegó a ninguna sesión: abre Claude Code para que el effort suba.', 'warn', 4200)
+  if (lash.source === 'vscode' && lash.target === 'effort' && !lash.reachedSession) {
+    showNote('Latigazo contado, pero no llegó a ninguna sesión: abre Claude Code para que el effort suba.')
   }
   startLoop()
 }
@@ -331,6 +411,7 @@ function frame(now: number): void {
   tickTimeline(dt * 1000)
   scene.step(dt)
   draw()
+  // En reposo el latigo se mece; con movimiento reducido el bucle para hasta el proximo latigazo.
   const keepGoing = state?.enabled !== false && !document.hidden && (!scene.reduced || scene.isAnimating || timeline.length > 0)
   frameRequest = keepGoing ? requestAnimationFrame(frame) : 0
   if (!keepGoing) lastFrame = 0
@@ -365,8 +446,38 @@ function lashFromPanel(target: Target): void {
   vscode.postMessage({ type: 'lash', target })
 }
 
-ui.targetModel.addEventListener('click', () => lashFromPanel('model'))
-ui.targetEffort.addEventListener('click', () => lashFromPanel('effort'))
+/** Si la app no confirma en este tiempo, el boton vuelve a quedar libre. */
+const PENDING_WHIP_MS = 4000
+const PENDING_OPEN_MS = 10000
+
+function toggleWhipMode(): void {
+  if (state === null || !state.desktop.alive || pendingWhip !== null) return
+  const timer = window.setTimeout(() => {
+    pendingWhip = null
+    if (state !== null) renderWhipMode(state)
+  }, PENDING_WHIP_MS)
+  pendingWhip = { active: !state.desktop.whipMode, timer }
+  renderWhipMode(state)
+  vscode.postMessage({ type: 'toggleWhipMode' })
+}
+
+function openDesktopApp(): void {
+  if (state === null || pendingOpen !== null) return
+  const timer = window.setTimeout(() => {
+    pendingOpen = null
+    if (state !== null) renderWhipMode(state)
+  }, PENDING_OPEN_MS)
+  pendingOpen = { timer }
+  renderWhipMode(state)
+  vscode.postMessage({ type: 'openDesktopApp' })
+}
+
+ui.lashModel.addEventListener('click', () => lashFromPanel('model'))
+ui.lashEffort.addEventListener('click', () => lashFromPanel('effort'))
+ui.whipToggle.addEventListener('click', toggleWhipMode)
+ui.openApp.addEventListener('click', openDesktopApp)
+ui.openAppRetry.addEventListener('click', openDesktopApp)
+ui.installGuide.addEventListener('click', () => vscode.postMessage({ type: 'openInstallGuide' }))
 ui.enabledSwitch.addEventListener('change', () => vscode.postMessage({ type: 'setEnabled', enabled: ui.enabledSwitch.checked }))
 ui.soundSwitch.addEventListener('change', () => vscode.postMessage({ type: 'setSound', sound: ui.soundSwitch.checked }))
 ui.installPlugin.addEventListener('click', () => vscode.postMessage({ type: 'installPlugin' }))
@@ -380,7 +491,7 @@ motionQuery.addEventListener('change', () => {
 new ResizeObserver(() => {
   layoutCanvas()
   draw()
-}).observe(ui.stage)
+}).observe(ui.preview)
 
 ui.toggleKey.textContent = toggleKeyLabel()
 scene.fontFamily = getComputedStyle(document.body).fontFamily || 'sans-serif'

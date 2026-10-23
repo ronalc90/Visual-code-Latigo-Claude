@@ -1,4 +1,5 @@
 import { progressFor } from '../../hooks/levels'
+import type { DesktopInfo } from './bridgeState'
 import { plural } from './format'
 
 export type StatusBarContent = {
@@ -6,12 +7,17 @@ export type StatusBarContent = {
   tooltip: string
 }
 
+const DESKTOP_CLOSED: DesktopInfo = { alive: false, whipMode: false }
+
 /** Texto y tooltip del item de la barra de estado. */
-export function formatStatusBar(enabled: boolean, total: number): StatusBarContent {
+export function formatStatusBar(enabled: boolean, total: number, desktop: DesktopInfo = DESKTOP_CLOSED): StatusBarContent {
   const { tier, next, remaining, progress } = progressFor(total)
-  const head = enabled ? `$(flame) Látigo · Nv ${tier.level}` : '$(circle-slash) Látigo · apagado'
+  const whipMode = enabled && desktop.alive && desktop.whipMode
+  const head = !enabled ? '$(circle-slash) Látigo · apagado' : whipMode ? `$(zap) Modo látigo · Nv ${tier.level}` : `$(flame) Látigo · Nv ${tier.level}`
   const lines = [
     enabled ? 'Látigo encendido' : 'Látigo apagado',
+    // Solo se menciona la app de escritorio cuando esta abierta.
+    ...(enabled && desktop.alive ? [whipMode ? 'Modo látigo en pantalla: activo (Esc para salir)' : 'Modo látigo en pantalla: apagado'] : []),
     `Nivel ${tier.level} · ${tier.name}`,
     next === null
       ? 'Nivel máximo: ya no hay más arriba'

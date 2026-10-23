@@ -18,5 +18,6 @@ export function registerCommands(controller: LatigoController): vscode.Disposabl
     register(COMMANDS.soundOff, () => controller.setSound(false)),
     register(COMMANDS.showStats, () => controller.showStats()),
     register(COMMANDS.installClaudePlugin, () => controller.installClaudePlugin()),
+    register(COMMANDS.toggleWhipMode, () => controller.toggleWhipMode()),
   ]
 }

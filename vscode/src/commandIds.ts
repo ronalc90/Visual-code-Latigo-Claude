@@ -11,6 +11,7 @@ export const COMMANDS = {
   soundOff: 'latigo.soundOff',
   showStats: 'latigo.showStats',
   installClaudePlugin: 'latigo.installClaudePlugin',
+  toggleWhipMode: 'latigo.toggleWhipMode',
 } as const
 
 export const VIEW_CONTAINER_ID = 'latigo'

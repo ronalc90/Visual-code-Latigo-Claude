@@ -13,13 +13,18 @@ import { systemClock } from './clock'
 import { VIEW_ID } from './commandIds'
 import { registerCommands } from './commands'
 import { LatigoController } from './controller'
+import { isDesktopAppSupported, launchDesktopApp } from './desktopApp'
 import { LashService } from './lashService'
 import { LatigoViewProvider } from './panel/LatigoViewProvider'
+import type { LashAnimation, ViewState } from './protocol'
 import { readSettings } from './settings'
 import { LatigoStatusBar } from './statusBar'
 
-/** Cada cuanto se revisa si la sesion de Claude Code sigue viva (la presencia caduca sola). */
-const PRESENCE_CHECK_MS = 5000
+/**
+ * Cada cuanto se revisa si la sesion de Claude Code y la app de escritorio
+ * siguen vivas (su presencia caduca sola; la de la app, a los 6 s).
+ */
+const LIVENESS_CHECK_MS = 2000
 
 /** Lo que devuelve `activate`; lo usan las pruebas de integracion. */
 export type LatigoApi = {
@@ -30,8 +35,11 @@ export type LatigoApi = {
   panelReady(): boolean
   /** True cuando el panel del latigo esta a la vista. */
   panelVisible(): boolean
+  /** Lo que el panel esta pintando (o pintaria si estuviera abierto). */
+  viewState(): ViewState
+  /** El ultimo latigazo que se le mando a animar al panel. */
+  lastPanelLash(): LashAnimation | null
 }
-
 
 export function activate(context: vscode.ExtensionContext): LatigoApi {
   const clock = systemClock
@@ -55,6 +63,7 @@ export function activate(context: vscode.ExtensionContext): LatigoApi {
     statusBar,
     clock,
     readSettings: () => readSettings(vscode.workspace.getConfiguration('latigo')),
+    desktopApp: { supported: isDesktopAppSupported(), launch: () => launchDesktopApp() },
   })
   const panel = new LatigoViewProvider(context.extensionUri, controller)
   controller.attachPanel(panel)
@@ -63,7 +72,7 @@ export function activate(context: vscode.ExtensionContext): LatigoApi {
   watcher.start()
   context.subscriptions.push(claudeFocus, claudeFocus.onDidEnterClaude(() => controller.onClaudeFocused()))
   claudeFocus.start()
-  const presenceTimer = setInterval(() => state.refresh('presence'), PRESENCE_CHECK_MS)
+  const livenessTimer = setInterval(() => state.refresh('presence'), LIVENESS_CHECK_MS)
 
   context.subscriptions.push(
     state,
@@ -72,7 +81,7 @@ export function activate(context: vscode.ExtensionContext): LatigoApi {
     controller,
     panel,
     watcher,
-    { dispose: () => clearInterval(presenceTimer) },
+    { dispose: () => clearInterval(livenessTimer) },
     vscode.window.registerWebviewViewProvider(VIEW_ID, panel),
     vscode.workspace.onDidChangeConfiguration(event => {
       if (event.affectsConfiguration('latigo')) controller.onSettingsChanged()
@@ -88,6 +97,8 @@ export function activate(context: vscode.ExtensionContext): LatigoApi {
     snapshot: () => state.snapshot,
     panelReady: () => panel.isReady,
     panelVisible: () => panel.isVisible,
+    viewState: () => controller.currentState(),
+    lastPanelLash: () => panel.lastLash,
   }
 }
 

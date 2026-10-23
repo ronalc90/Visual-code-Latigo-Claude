@@ -15,6 +15,7 @@ export interface PanelHost {
 export class LatigoViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   private view: vscode.WebviewView | undefined
   private ready = false
+  private sentLash: LashAnimation | null = null
   private readonly disposables: vscode.Disposable[] = []
 
   constructor(
@@ -83,12 +84,19 @@ export class LatigoViewProvider implements vscode.WebviewViewProvider, vscode.Di
   }
 
   postLash(lash: LashAnimation): void {
-    this.post({ type: 'lash', lash })
+    if (this.post({ type: 'lash', lash })) this.sentLash = lash
   }
 
-  private post(message: HostMessage): void {
-    if (this.view === undefined || !this.ready) return
+  /** El ultimo latigazo que de verdad se le mando al webview. */
+  get lastLash(): LashAnimation | null {
+    return this.sentLash
+  }
+
+  /** Manda el mensaje si el webview esta listo; devuelve si lo mando. */
+  private post(message: HostMessage): boolean {
+    if (this.view === undefined || !this.ready) return false
     void this.view.webview.postMessage(message)
+    return true
   }
 
   dispose(): void {

@@ -21,6 +21,10 @@ export type BridgePaths = {
   lash: string
   /** Lo escribe el mod cada pocos segundos: hay una sesion viva y con que effort. */
   presence: string
+  /** Lo escribe la app de escritorio: esta abierta y si el modo latigo esta activo. */
+  desktop: string
+  /** Pedido de VS Code a la app de escritorio para prender o apagar el modo latigo. */
+  whipMode: string
 }
 
 export function bridgePaths(home: string): BridgePaths {
@@ -32,6 +36,8 @@ export function bridgePaths(home: string): BridgePaths {
     effort: `${dir}/effort.json`,
     lash: `${dir}/lash.json`,
     presence: `${dir}/presence.json`,
+    desktop: `${dir}/desktop.json`,
+    whipMode: `${dir}/whipmode.json`,
   }
 }
 
@@ -49,7 +55,8 @@ export type EffortRequests = {
   at: number
 }
 
-export type LashSource = 'terminal' | 'vscode'
+/** Quien dio el latigazo: la banda de la consola, el panel de VS Code o la app de escritorio (el latigo en pantalla). */
+export type LashSource = 'terminal' | 'vscode' | 'desktop'
 
 export type LashEvent = {
   id: string
@@ -126,7 +133,7 @@ export function parseLashEvent(text: string | undefined | null): LashEvent | nul
   if (raw === undefined) return null
   const target = raw.target
   const source = raw.source
-  if (typeof raw.id !== 'string' || (target !== 'model' && target !== 'effort') || (source !== 'terminal' && source !== 'vscode')) {
+  if (typeof raw.id !== 'string' || (target !== 'model' && target !== 'effort') || (source !== 'terminal' && source !== 'vscode' && source !== 'desktop')) {
     return null
   }
   return {
@@ -172,4 +179,43 @@ export function serializePresence(presence: Presence): string {
 
 export function isPresenceAlive(presence: Presence | null, now: number): boolean {
   return presence !== null && now - presence.at >= 0 && now - presence.at < PRESENCE_TTL_MS
+}
+
+/** La app de escritorio se da por abierta si escribio presencia hace menos de esto. */
+export const DESKTOP_TTL_MS = 6_000
+
+export type DesktopPresence = {
+  at: number
+  /** El modo latigo (puntero de latigo en pantalla) esta activo. */
+  whipMode: boolean
+}
+
+export function parseDesktopPresence(text: string | undefined | null): DesktopPresence | null {
+  const raw = asRecord(parseJson(text))
+  if (raw === undefined) return null
+  return { at: finiteNumber(raw.at, 0), whipMode: raw.whipMode === true }
+}
+
+export function serializeDesktopPresence(presence: DesktopPresence): string {
+  return JSON.stringify({ version: BRIDGE_VERSION, ...presence }) + '\n'
+}
+
+export function isDesktopAlive(presence: DesktopPresence | null, now: number): boolean {
+  return presence !== null && now - presence.at >= 0 && now - presence.at < DESKTOP_TTL_MS
+}
+
+export type WhipModeRequest = {
+  /** Sube 1 por cada pedido, para que la app note dos pedidos seguidos iguales. */
+  seq: number
+  active: boolean
+}
+
+export function parseWhipModeRequest(text: string | undefined | null): WhipModeRequest | null {
+  const raw = asRecord(parseJson(text))
+  if (raw === undefined || typeof raw.active !== 'boolean') return null
+  return { seq: Math.max(0, Math.floor(finiteNumber(raw.seq, 0))), active: raw.active }
+}
+
+export function serializeWhipModeRequest(request: WhipModeRequest): string {
+  return JSON.stringify({ version: BRIDGE_VERSION, ...request }) + '\n'
 }

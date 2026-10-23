@@ -12,7 +12,7 @@ type Manifest = {
   icon: string
   contributes: {
     commands: Array<{ command: string; title: string; category: string }>
-    keybindings: Array<{ command: string; key: string; mac: string; linux?: string; win?: string }>
+    keybindings: Array<{ command: string; key: string; mac?: string; linux?: string; win?: string }>
     viewsContainers: { activitybar: Array<{ id: string; icon: string }> }
     views: Record<string, Array<{ id: string; type: string }>>
     menus: Record<string, Array<{ command: string; when?: string }>>
@@ -36,10 +36,17 @@ describe('package.json', () => {
   it('el atajo de encender/apagar esta declarado para mac, windows y linux', () => {
     const binding = manifest.contributes.keybindings.find(item => item.command === COMMANDS.toggle)
     assert.ok(binding)
-    assert.equal(binding.mac, 'ctrl+cmd+l')
+    // Ctrl+Cmd+L es del modo latigo de la app de escritorio (atajo global).
+    assert.equal(binding.mac, undefined)
     assert.equal(binding.key, 'shift+alt+l')
     assert.equal(binding.linux, undefined)
     assert.equal(binding.win, undefined)
+  })
+
+  it('el modo latigo en pantalla no tiene atajo en VS Code (Ctrl+Cmd+L lo tiene la app de escritorio)', () => {
+    assert.ok(!manifest.contributes.keybindings.some(item => item.command === COMMANDS.toggleWhipMode))
+    const command = manifest.contributes.commands.find(item => item.command === COMMANDS.toggleWhipMode)
+    assert.equal(command?.title, 'Prender/Apagar el modo látigo en pantalla')
   })
 
   it('ningun atajo usa Ctrl+Alt+letra (en Windows es AltGr y tapa letras como la ł)', () => {

@@ -2,6 +2,29 @@
 
 Todos los cambios importantes de la extensión **Látigo para Claude Code**.
 
+## [0.4.0] - 2026-10-22
+
+El látigo grande se va a la app de escritorio: la barra lateral pasa a ser el panel de estadísticas y control.
+
+### Agregado
+
+- **Modo látigo en pantalla:** botón grande *Activar modo látigo* / *Apagar modo látigo* que se lo pide a la app de escritorio (`~/.claude-latigo/whipmode.json`). El panel muestra si la app está abierta y si el modo está activo (`desktop.json`).
+- **App cerrada o sin instalar:** botón **Abrir la app** (`open -a "Látigo"`, solo Mac) y, si no está instalada, enlace a la guía de instalación. En Windows y Linux dice que por ahora es solo para Mac.
+- Comando **Látigo: Prender/Apagar el modo látigo en pantalla**, sin atajo en VS Code (`Ctrl+Cmd+L` lo tiene la app).
+- En Mac, prender y apagar el látigo pasa a `Shift+Option+L` (como en Windows y Linux), para dejarle `Ctrl+Cmd+L` a la app.
+- **Vista previa del látigo** en la tarjeta de nivel: se mece, echa chispas según el nivel y da un chasquido con el grito del combo por cada latigazo, venga de VS Code, de la terminal o del látigo en pantalla.
+- La barra de estado muestra `⚡ Modo látigo · Nv N` cuando el modo látigo está activo.
+
+### Cambiado
+
+- **Panel rediseñado para la barra lateral angosta** (280 a 360 px): tarjetas de modo látigo, sesión de Claude Code, nivel, estadísticas y Top global. En ancho completo se acomoda en dos o tres columnas.
+- Los latigazos al effort y al modelo pasan a ser dos botones chicos en la tarjeta de la sesión.
+- Los latigazos de la terminal que suben de nivel ahora también muestran el letrero.
+
+### Quitado
+
+- El escenario grande con los blancos *Modelo* y *Effort*: el látigo grande ahora es el de la app de escritorio.
+
 ## [0.3.0] - 2026-10-22
 
 ### Agregado

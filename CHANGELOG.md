@@ -1,5 +1,27 @@
 # Cambios
 
+## 0.4.0 · 2026-10-22
+
+El látigo sale a la pantalla.
+
+### App de escritorio para Mac (nueva)
+- **Modo látigo con `Ctrl+Cmd+L`** desde cualquier app (`Esc` sale). El puntero se vuelve un látigo con física de cuerda que cuelga, se mece y restalla.
+- **Cada clic restalla encima de la pantalla** y los clics siguen llegando a las apps. Sobre una conversación de Claude (VS Code, terminales, app de Claude), el golpe sube un nivel de effort.
+- **Golpe** con destello, onda de choque, chispas del nivel, grito y combos.
+- **Sonido sintetizado en cada golpe, nunca igual**, imitando un látigo real: zumbido que acelera, onda de choque de la punta, doble chasquido a veces, caída de la cuerda y eco.
+- **Menú en la barra:** nivel, sonido, abrir al iniciar sesión.
+- App universal (Intel y Apple Silicon), con 98 comprobaciones propias.
+
+### Plugin de Claude Code
+- Alterna tres chasquidos nuevos, más reales.
+- Acepta y anima los latigazos de la app de escritorio.
+- 99 pruebas.
+
+### Extensión de VS Code
+- La barra lateral pasa a ser de **estadísticas y control**: modo látigo en pantalla, sesión de Claude, látigo del nivel en miniatura, números, mejores días y el Top global en gris.
+- En Mac, prender y apagar el látigo pasa a `Shift+Option+L`; `Ctrl+Cmd+L` queda para el modo látigo de la app.
+- 147 pruebas unitarias y 26 en un VS Code real.
+
 ## 0.3.0 · 2026-10-22
 
 Funciona igual en la consola y en el Claude de VS Code.

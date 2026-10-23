@@ -1,9 +1,10 @@
-// La foto actual del puente (interruptor, conteos y sesion de Claude Code) y
-// los latigazos que llegan desde la terminal. Se refresca cuando el watcher
-// avisa o cuando la extension escribe algo.
+// La foto actual del puente (interruptor, conteos, sesion de Claude Code y app
+// de escritorio) y los latigazos que llegan de afuera (la terminal o el latigo
+// en pantalla). Se refresca cuando el watcher avisa o cuando la extension
+// escribe algo.
 
-import type { LashEvent, LatigoConfig, Presence } from '../../hooks/bridge'
-import { isPresenceAlive } from '../../hooks/bridge'
+import type { DesktopPresence, LashEvent, LatigoConfig, Presence } from '../../hooks/bridge'
+import { isDesktopAlive, isPresenceAlive } from '../../hooks/bridge'
 import type { Stats } from '../../hooks/model'
 import { mergeStats } from '../../hooks/model'
 import type { BridgeFile } from './bridgeWatcher'
@@ -18,10 +19,18 @@ export type SessionInfo = {
   boost: Presence['boost']
 }
 
+export type DesktopInfo = {
+  /** La app de escritorio escribio su presencia hace poco. */
+  alive: boolean
+  /** El modo latigo (el puntero hecho latigo) esta activo; false si la app esta cerrada. */
+  whipMode: boolean
+}
+
 export type BridgeSnapshot = {
   config: LatigoConfig
   stats: Stats
   session: SessionInfo
+  desktop: DesktopInfo
 }
 
 function sessionFrom(presence: Presence | null, now: number): SessionInfo {
@@ -34,6 +43,11 @@ function sessionFrom(presence: Presence | null, now: number): SessionInfo {
   }
 }
 
+function desktopFrom(presence: DesktopPresence | null, now: number): DesktopInfo {
+  const alive = isDesktopAlive(presence, now)
+  return { alive, whipMode: alive && presence?.whipMode === true }
+}
+
 function sameSnapshot(a: BridgeSnapshot, b: BridgeSnapshot): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
 }
@@ -42,11 +56,11 @@ export class BridgeState {
   private current: BridgeSnapshot
   private lastLashId: string | null
   private readonly changed = new Emitter<BridgeSnapshot>()
-  private readonly terminalLash = new Emitter<LashEvent>()
+  private readonly externalLash = new Emitter<LashEvent>()
 
   readonly onDidChange = this.changed.event
-  /** Un latigazo dado en la banda de Claude Code (no los de VS Code). */
-  readonly onTerminalLash = this.terminalLash.event
+  /** Un latigazo dado fuera de VS Code: en la banda de Claude Code o con el latigo en pantalla. */
+  readonly onExternalLash = this.externalLash.event
 
   constructor(
     private readonly store: BridgeStore,
@@ -68,6 +82,7 @@ export class BridgeState {
       // Los conteos solo crecen: un archivo truncado no los devuelve a cero.
       stats: previousStats === undefined ? stats : mergeStats(previousStats, stats),
       session: sessionFrom(this.store.readPresence(), this.clock.now()),
+      desktop: desktopFrom(this.store.readDesktop(), this.clock.now()),
     }
   }
 
@@ -86,11 +101,12 @@ export class BridgeState {
     const lash = this.store.readLash()
     if (lash === null || lash.id === this.lastLashId) return
     this.lastLashId = lash.id
-    if (lash.source === 'terminal') this.terminalLash.fire(lash)
+    // Los de VS Code ya los animo el propio panel.
+    if (lash.source !== 'vscode') this.externalLash.fire(lash)
   }
 
   dispose(): void {
     this.changed.dispose()
-    this.terminalLash.dispose()
+    this.externalLash.dispose()
   }
 }

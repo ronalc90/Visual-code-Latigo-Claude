@@ -1,6 +1,7 @@
 // Mensajes entre la extension y el webview del panel. Lo comparten los dos
 // lados; el host valida todo lo que llega porque el webview es otro proceso.
 
+import type { LashSource } from '../../hooks/bridge'
 import type { Effort, Stats, Target } from '../../hooks/model'
 
 export type ReducedMotion = 'auto' | 'on' | 'off'
@@ -21,6 +22,15 @@ export type ViewState = {
     effort: Effort | null
     boost: Effort | null
   }
+  /** La app de escritorio del latigo en pantalla. */
+  desktop: {
+    /** La app existe para este sistema (por ahora solo Mac). */
+    supported: boolean
+    alive: boolean
+    whipMode: boolean
+    /** El ultimo intento de abrirla fallo: casi seguro no esta instalada. */
+    appMissing: boolean
+  }
 }
 
 /** Un latigazo para animar en el panel. */
@@ -34,7 +44,7 @@ export type LashAnimation = {
   /** Solo para latigazos al effort dados en VS Code. */
   reachedSession: boolean
   sound: boolean
-  source: 'vscode' | 'terminal'
+  source: LashSource
 }
 
 export type HostMessage = { type: 'state'; state: ViewState } | { type: 'lash'; lash: LashAnimation }
@@ -45,6 +55,9 @@ export type WebviewMessage =
   | { type: 'setEnabled'; enabled: boolean }
   | { type: 'setSound'; sound: boolean }
   | { type: 'installPlugin' }
+  | { type: 'toggleWhipMode' }
+  | { type: 'openDesktopApp' }
+  | { type: 'openInstallGuide' }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -59,7 +72,10 @@ export function parseWebviewMessage(value: unknown): WebviewMessage | null {
     case 'ready':
       return only() ? { type: 'ready' } : null
     case 'installPlugin':
-      return only() ? { type: 'installPlugin' } : null
+    case 'toggleWhipMode':
+    case 'openDesktopApp':
+    case 'openInstallGuide':
+      return only() ? { type: value.type } : null
     case 'lash':
       return only('target') && (value.target === 'model' || value.target === 'effort') ? { type: 'lash', target: value.target } : null
     case 'setEnabled':

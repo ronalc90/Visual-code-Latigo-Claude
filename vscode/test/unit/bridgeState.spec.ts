@@ -1,7 +1,7 @@
 import * as assert from 'node:assert/strict'
 
 import type { LashEvent } from '../../../hooks/bridge'
-import { PRESENCE_TTL_MS } from '../../../hooks/bridge'
+import { DESKTOP_TTL_MS, PRESENCE_TTL_MS } from '../../../hooks/bridge'
 import { EMPTY_STATS } from '../../../hooks/model'
 import type { BridgeSnapshot } from '../../src/bridgeState'
 import { BridgeState } from '../../src/bridgeState'
@@ -57,11 +57,11 @@ describe('BridgeState', () => {
     assert.equal(state.snapshot.stats.total, 12)
   })
 
-  it('anima los latigazos nuevos de la terminal, no los de VS Code ni el que ya estaba', () => {
+  it('anima los latigazos nuevos de la terminal y de la pantalla, no los de VS Code ni el que ya estaba', () => {
     bridge.store.writeLash({ id: 'viejo', at: 1, target: 'model', combo: 1, total: 1, source: 'terminal' })
     const state = new BridgeState(bridge.store, clock)
     const seen: LashEvent[] = []
-    state.onTerminalLash(event => seen.push(event))
+    state.onExternalLash(event => seen.push(event))
     state.refresh('lash')
     bridge.store.writeLash({ id: 'mio', at: 2, target: 'effort', combo: 1, total: 2, source: 'vscode' })
     state.refresh('lash')
@@ -69,13 +69,39 @@ describe('BridgeState', () => {
     state.refresh('lash')
     state.refresh('lash')
     state.refresh()
-    assert.deepEqual(seen.map(event => event.id), ['t1'])
+    bridge.store.writeLash({ id: 'd1', at: 4, target: 'effort', combo: 3, total: 4, source: 'desktop' })
+    state.refresh('lash')
+    assert.deepEqual(seen.map(event => [event.id, event.source]), [
+      ['t1', 'terminal'],
+      ['d1', 'desktop'],
+    ])
+  })
+
+  it('lee la app de escritorio: abierta, con el modo latigo, y cerrada cuando caduca', () => {
+    const state = new BridgeState(bridge.store, clock)
+    assert.deepEqual(state.snapshot.desktop, { alive: false, whipMode: false })
+    const seen: BridgeSnapshot[] = []
+    state.onDidChange(snapshot => seen.push(snapshot))
+    writeRaw(bridge.store.paths.desktop, JSON.stringify({ at: clock.now(), whipMode: true }))
+    state.refresh('desktop')
+    assert.deepEqual(state.snapshot.desktop, { alive: true, whipMode: true })
+    assert.equal(seen.length, 1)
+    clock.advance(DESKTOP_TTL_MS + 1)
+    state.refresh('presence')
+    // Cerrada, el modo latigo no cuenta aunque el archivo diga que si.
+    assert.deepEqual(state.snapshot.desktop, { alive: false, whipMode: false })
+  })
+
+  it('un desktop.json roto deja la app por cerrada', () => {
+    writeRaw(bridge.store.paths.desktop, '{roto')
+    const state = new BridgeState(bridge.store, clock)
+    assert.deepEqual(state.snapshot.desktop, { alive: false, whipMode: false })
   })
 
   it('un lash.json roto se ignora', () => {
     const state = new BridgeState(bridge.store, clock)
     const seen: LashEvent[] = []
-    state.onTerminalLash(event => seen.push(event))
+    state.onExternalLash(event => seen.push(event))
     writeRaw(bridge.store.paths.lash, JSON.stringify({ id: 9, target: 'otro', source: 'terminal' }))
     state.refresh('lash')
     assert.equal(seen.length, 0)

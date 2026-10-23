@@ -1,8 +1,8 @@
 {
   "name": "latigo-claude",
   "displayName": "Látigo para Claude Code",
-  "description": "Un látigo para Claude Code dentro de VS Code: latigazos animados con sonido, combos, niveles que se van dorando y un clic al effort para subirlo.",
-  "version": "0.3.0",
+  "description": "Un látigo para Claude Code en VS Code: tus latigazos, tu nivel y el modo látigo en pantalla a un clic, en la barra lateral.",
+  "version": "0.4.0",
   "publisher": "ronalc90",
   "author": {
     "name": "Ronald Cipagauta",
@@ -109,13 +109,18 @@
         "title": "Instalar el plugin en Claude Code",
         "category": "Látigo",
         "icon": "$(terminal)"
+      },
+      {
+        "command": "latigo.toggleWhipMode",
+        "title": "Prender/Apagar el modo látigo en pantalla",
+        "category": "Látigo",
+        "icon": "$(zap)"
       }
     ],
     "keybindings": [
       {
         "command": "latigo.toggle",
-        "key": "shift+alt+l",
-        "mac": "ctrl+cmd+l"
+        "key": "shift+alt+l"
       }
     ],
     "viewsContainers": {

@@ -63,22 +63,31 @@ function day(offset) {
   return date.toISOString().slice(0, 10)
 }
 
-function stats(total, onEffort, bestCombo, days) {
-  const byDay = {}
-  days.forEach((count, index) => {
-    byDay[day(index * 3 + 1)] = count
+/**
+ * Conteos que cuadran: al effort + al modelo = total, hoy esta en byDay y la
+ * suma de los dias no pasa del total.
+ */
+function stats(total, onEffort, bestCombo, today, pastDays) {
+  const byDay = { [day(0)]: today }
+  pastDays.forEach((count, index) => {
+    byDay[day(index * 2 + 1)] = count
   })
+  const counted = Object.values(byDay).reduce((sum, n) => sum + n, 0)
+  if (counted > total) throw new Error(`los dias suman ${counted} y el total es ${total}`)
   return { total, onModel: total - onEffort, onEffort, bestCombo, byDay }
 }
 
 function topOf(s) {
   return Object.entries(s.byDay)
+    .filter(([, n]) => n > 0)
     .sort(([a, x], [b, y]) => y - x || b.localeCompare(a))
     .slice(0, 5)
 }
 
-function viewState({ enabled = true, sound = true, total, onEffort, bestCombo, days, today, session }) {
-  const s = stats(total, onEffort, bestCombo, days)
+const desktopApp = (alive, whipMode, appMissing = false) => ({ supported: true, alive, whipMode, appMissing })
+
+function viewState({ enabled = true, sound = true, total, onEffort, bestCombo, days, today, session, desktop = desktopApp(true, false) }) {
+  const s = stats(total, onEffort, bestCombo, today, days)
   return {
     enabled,
     sound,
@@ -88,93 +97,88 @@ function viewState({ enabled = true, sound = true, total, onEffort, bestCombo, d
     today,
     topDays: topOf(s),
     session,
+    desktop,
   }
 }
 
 const opus = { alive: true, model: 'claude-opus-5-5', effort: 'high', boost: null }
 
-const lash = (id, target, combo, comboTitle, total, levelUp = false) => ({
+const lash = (id, source, target, combo, comboTitle, total, levelUp = false) => ({
   type: 'lash',
-  lash: { id, target, combo, comboTitle, total, levelUp, reachedSession: true, sound: false, source: 'vscode' },
+  lash: { id, target, combo, comboTitle, total, levelUp, reachedSession: true, sound: false, source },
 })
 
 /**
  * Lo que la extension manda tras un latigazo: la animacion y el estado ya
  * contado (total, al effort o al modelo, hoy y mejor combo), como el host real.
  */
-function lashed(base, id, target, combo, comboTitle, levelUp = false) {
+function lashed(base, id, source, target, combo, comboTitle, levelUp = false) {
   base.total += 1
   if (target === 'effort') base.onEffort += 1
   base.today += 1
   base.bestCombo = Math.max(base.bestCombo, combo)
-  return [lash(id, target, combo, comboTitle, base.total, levelUp), { type: 'state', state: viewState({ ...base }) }]
+  return [lash(id, source, target, combo, comboTitle, base.total, levelUp), { type: 'state', state: viewState({ ...base }) }]
 }
 
-const nivel5 = { total: 247, onEffort: 171, bestCombo: 6, days: [41, 37, 30, 22, 18], today: 40, session: { ...opus, effort: 'medium', boost: 'high' } }
-const nivel9 = { total: 1412, onEffort: 1003, bestCombo: 14, days: [133, 120, 96, 88, 71], today: 93, session: { ...opus, effort: 'high', boost: 'xhigh' } }
-const nivel9b = { ...nivel9, days: [...nivel9.days] }
-const nivel14 = { total: 6999, onEffort: 5120, bestCombo: 23, days: [402, 377, 351, 340, 298], today: 350, session: { ...opus, effort: 'xhigh', boost: 'max' } }
+const nivel5 = { total: 247, onEffort: 171, bestCombo: 6, days: [41, 37, 30, 22], today: 40, session: { ...opus, effort: 'medium', boost: 'high' } }
+const nivel9 = { total: 1412, onEffort: 1003, bestCombo: 14, days: [133, 120, 96, 88], today: 93, session: { ...opus, effort: 'high', boost: 'xhigh' } }
+const nivel9Activo = { ...nivel9, days: [...nivel9.days], desktop: desktopApp(true, true) }
+const nivel9Cerrada = { ...nivel9, days: [...nivel9.days], desktop: desktopApp(false, false) }
+const nivel14 = { total: 6999, onEffort: 5120, bestCombo: 23, days: [402, 377, 351, 340], today: 350, session: { ...opus, effort: 'xhigh', boost: 'max' }, desktop: desktopApp(true, true) }
 
 // Cada escena: estado, latigazos y cuanto avanzar el reloj despues de cada uno.
+// Las angostas (340 px) son la barra lateral, donde vive el panel.
 const scenes = [
   {
-    file: 'nivel-1-reposo.png',
-    seed: 3,
-    size: [1280, 440],
-    state: viewState({ total: 9, onEffort: 6, bestCombo: 2, days: [5, 4], today: 5, session: opus }),
-    steps: [{ advance: 900 }],
-  },
-  {
-    file: 'nivel-5-latigazo.png',
-    seed: 11,
-    size: [1280, 480],
-    state: viewState({ ...nivel5 }),
-    steps: [{ advance: 400 }, { message: lashed(nivel5, 'a1', 'effort', 1, ''), advance: 370 }],
-  },
-  {
-    file: 'nivel-9-combo.png',
+    file: 'barra-lateral.png',
     seed: 29,
-    size: [1280, 480],
+    size: [340, 1250],
     state: viewState({ ...nivel9 }),
     steps: [
       { advance: 300 },
-      { message: lashed(nivel9, 'b1', 'effort', 1, ''), advance: 300 },
-      { message: lashed(nivel9, 'b2', 'effort', 2, '¡DOBLE!'), advance: 300 },
-      { message: lashed(nivel9, 'b3', 'effort', 3, '¡TRIPLE!'), advance: 265 },
+      { message: lashed(nivel9, 'b1', 'desktop', 'effort', 1, ''), advance: 300 },
+      { message: lashed(nivel9, 'b2', 'desktop', 'effort', 2, '¡DOBLE!'), advance: 300 },
+      { message: lashed(nivel9, 'b3', 'desktop', 'effort', 3, '¡TRIPLE!'), advance: 245 },
     ],
+  },
+  {
+    file: 'modo-latigo-activo.png',
+    seed: 13,
+    size: [340, 700],
+    state: viewState({ ...nivel9Activo }),
+    steps: [{ advance: 900 }],
+  },
+  {
+    file: 'app-cerrada.png',
+    seed: 17,
+    size: [340, 666],
+    state: viewState({ ...nivel9Cerrada }),
+    steps: [{ advance: 700 }],
   },
   {
     file: 'nivel-14-divino.png',
     seed: 41,
-    size: [1280, 480],
+    size: [340, 640],
     state: viewState({ ...nivel14 }),
-    steps: [{ advance: 1200 }, { message: lashed(nivel14, 'c1', 'effort', 1, '', true), advance: 330 }],
-  },
-  {
-    file: 'barra-lateral.png',
-    seed: 29,
-    size: [340, 1040],
-    state: viewState({ ...nivel9b }),
-    steps: [
-      { advance: 300 },
-      { message: lashed(nivel9b, 'd1', 'effort', 1, ''), advance: 300 },
-      { message: lashed(nivel9b, 'd2', 'effort', 2, '¡DOBLE!'), advance: 300 },
-      { message: lashed(nivel9b, 'd3', 'effort', 3, '¡TRIPLE!'), advance: 265 },
-    ],
-  },
-  {
-    file: 'sin-sesion.png',
-    seed: 5,
-    size: [1280, 480],
-    state: viewState({ total: 74, onEffort: 40, bestCombo: 4, days: [21, 18, 13, 9, 6], today: 21, session: { alive: false, model: null, effort: null, boost: null } }),
-    steps: [{ advance: 700 }],
+    steps: [{ advance: 1200 }, { message: lashed(nivel14, 'c1', 'desktop', 'effort', 1, '', true), advance: 330 }],
   },
   {
     file: 'apagado.png',
     seed: 1,
-    size: [1280, 230],
-    state: viewState({ enabled: false, total: 1412, onEffort: 1003, bestCombo: 14, days: [133, 120], today: 96, session: opus }),
+    size: [340, 340],
+    state: viewState({ enabled: false, ...nivel9, days: [...nivel9.days] }),
     steps: [{ advance: 100 }],
+  },
+  {
+    file: 'ancho-completo.png',
+    seed: 11,
+    size: [1280, 560],
+    state: viewState({ ...nivel5 }),
+    steps: [
+      { advance: 400 },
+      { message: lashed(nivel5, 'a1', 'terminal', 'effort', 1, ''), advance: 300 },
+      { message: lashed(nivel5, 'a2', 'terminal', 'effort', 2, '¡DOBLE!'), advance: 245 },
+    ],
   },
 ]
 

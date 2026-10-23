@@ -39,7 +39,8 @@ const FRAME_MS = 70
 const POLL_MS = 600
 const PRESENCE_EVERY_POLLS = 5
 const TWINKLE_MS = 450
-const CRACK_SOUND = 'assets/latigo.wav'
+/** Tres chasquidos distintos (scripts/sonidos.py): cada latigazo suena diferente. */
+const CRACK_SOUNDS = ['assets/latigo.wav', 'assets/latigo-2.wav', 'assets/latigo-3.wav']
 const LEVEL_SOUND = 'assets/nivel.wav'
 const STORE_KEY = 'stats'
 
@@ -260,7 +261,7 @@ async function crack($: EngineInterface, target: Target): Promise<CrackResult | 
   await update($, stats, () => after)
   await $.store.set(STORE_KEY, after)
 
-  if (await read($, sound)) play($, leveledUp ? LEVEL_SOUND : CRACK_SOUND)
+  if (await read($, sound)) play($, leveledUp ? LEVEL_SOUND : CRACK_SOUNDS[Math.floor(Math.random() * CRACK_SOUNDS.length)]!)
   if (leveledUp) {
     const { tier } = progressFor(after.total)
     $.ui.toast(`¡Nivel ${tier.level}! Tu látigo ahora es ${tier.name}.`)
@@ -388,7 +389,7 @@ async function poll($: EngineInterface): Promise<void> {
     seenLashId = event.id
     const onDisk = parseStatsFile(await readText($, paths.stats))
     await update($, stats, current => mergeStats(current, onDisk))
-    if (event.source === 'vscode' && isOn) {
+    if (event.source !== 'terminal' && isOn) {
       await animate($, { frame: 0, target: event.target, combo: event.combo, raisedTo: null, isLevelUp: false })
     }
   }

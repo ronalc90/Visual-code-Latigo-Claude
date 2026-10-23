@@ -30,6 +30,14 @@ Con el push a `main` ya está publicado. Para instalarlo, cualquiera escribe est
 
 Quien ya lo tenga recibe la versión nueva con `/plugin` → *Marketplaces* → *Update*, o con `claude plugin marketplace update visual-code-latigo-claude`.
 
+## App de escritorio
+
+```
+desktop/build.sh --test
+```
+
+Sale `desktop/build/Latigo-macOS.zip` (universal, firma local *ad hoc*); se adjunta a la versión de GitHub. Para distribuirla sin el aviso de Gatekeeper hay que firmarla con un *Developer ID* de Apple y notarizarla (cuenta de desarrollador de Apple, de pago).
+
 ## Extensión de VS Code
 
 ### Una sola vez: crear el publicador

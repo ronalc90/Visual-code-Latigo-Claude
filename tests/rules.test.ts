@@ -5,9 +5,15 @@ import { describe, expect, test } from 'claude-code/testing'
 import { FRAME_COUNT, IMPACT_FROM, SKY_WIDTH, WHIP_WIDTH, layoutBand, levelBadge, partsWidth, skyRow, statsTable, whipParts } from '../hooks/band'
 import {
   DEFAULT_CONFIG,
+  DESKTOP_TTL_MS,
   PRESENCE_TTL_MS,
   bridgePaths,
+  isDesktopAlive,
   isPresenceAlive,
+  parseDesktopPresence,
+  parseWhipModeRequest,
+  serializeDesktopPresence,
+  serializeWhipModeRequest,
   parseConfig,
   parseEffortRequests,
   parseEffortRequestsStrict,
@@ -285,6 +291,8 @@ describe('puente', () => {
       effort: '/Users/ana/.claude-latigo/effort.json',
       lash: '/Users/ana/.claude-latigo/lash.json',
       presence: '/Users/ana/.claude-latigo/presence.json',
+      desktop: '/Users/ana/.claude-latigo/desktop.json',
+      whipMode: '/Users/ana/.claude-latigo/whipmode.json',
     })
   })
 
@@ -324,8 +332,20 @@ describe('puente', () => {
     expect(parseLashEvent(serializeLashEvent(event))).toEqual(event)
     expect(parseLashEvent('{"id":"x","target":"pie","source":"vscode"}')).toBe(null)
     expect(parseLashEvent('{"id":"x","target":"model","source":"marte"}')).toBe(null)
+    expect(parseLashEvent('{"id":"x","target":"effort","source":"desktop"}')).toMatchObject({ source: 'desktop' })
     expect(parseLashEvent('basura')).toBe(null)
     expect(parseLashEvent('{"id":"x","target":"model","source":"terminal","combo":0}')).toMatchObject({ combo: 1, total: 0 })
+  })
+
+  test('la app de escritorio: presencia y pedido del modo latigo', async () => {
+    const desktop = { at: 1000, whipMode: true }
+    expect(parseDesktopPresence(serializeDesktopPresence(desktop))).toEqual(desktop)
+    expect(parseDesktopPresence('{"at":5}')).toEqual({ at: 5, whipMode: false })
+    expect(parseDesktopPresence('basura')).toBe(null)
+    expect(isDesktopAlive(desktop, 1000 + DESKTOP_TTL_MS - 1)).toBe(true)
+    expect(isDesktopAlive(desktop, 1000 + DESKTOP_TTL_MS)).toBe(false)
+    expect(parseWhipModeRequest(serializeWhipModeRequest({ seq: 3, active: true }))).toEqual({ seq: 3, active: true })
+    expect(parseWhipModeRequest('{"seq":1}')).toBe(null)
   })
 
   test('la presencia caduca a los 15 segundos', async () => {

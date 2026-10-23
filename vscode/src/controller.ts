@@ -4,16 +4,18 @@
 
 import * as vscode from 'vscode'
 
+import type { WhipModeRequest } from '../../hooks/bridge'
 import type { Target } from '../../hooks/model'
-import { comboTitle } from '../../hooks/model'
 import type { BridgeState } from './bridgeState'
 import type { BridgeStore } from './bridgeStore'
 import type { Clock } from './clock'
 import { CLAUDE_PLUGIN_INSTALL, CONTEXT_ENABLED, CONTEXT_SOUND, VIEW_ID } from './commandIds'
+import { DESKTOP_APP_INSTALL_URL } from './desktopApp'
 import { formatCount } from './format'
+import { animationForExternal, animationForResult } from './lashAnimation'
 import type { LashResult, LashService } from './lashService'
 import type { LatigoViewProvider, PanelHost } from './panel/LatigoViewProvider'
-import type { LashAnimation, ViewState, WebviewMessage } from './protocol'
+import type { ViewState, WebviewMessage } from './protocol'
 import type { ExtensionSettings } from './settings'
 import type { LatigoStatusBar } from './statusBar'
 import { buildViewState } from './viewState'
@@ -27,46 +29,32 @@ export type ControllerDeps = {
   statusBar: LatigoStatusBar
   clock: Clock
   readSettings: () => ExtensionSettings
+  /** La app de escritorio: si existe para este sistema y como abrirla. */
+  desktopApp: DesktopAppLauncher
 }
 
-function animationFor(result: LashResult): LashAnimation {
-  return {
-    id: result.id,
-    target: result.target,
-    combo: result.combo,
-    comboTitle: result.comboTitle,
-    total: result.total,
-    levelUp: result.levelUp,
-    reachedSession: result.reachedSession,
-    sound: result.sound,
-    source: 'vscode',
-  }
+export type DesktopAppLauncher = {
+  supported: boolean
+  /** Abre la app; se rechaza si no se pudo (casi siempre porque no esta instalada). */
+  launch(): Promise<void>
 }
+
+const OPEN_APP = 'Abrir la app'
+const INSTALL_GUIDE = 'Cómo instalarla'
 
 export class LatigoController implements PanelHost, vscode.Disposable {
   private panel: LatigoViewProvider | undefined
   private settings: ExtensionSettings
+  /** El ultimo intento de abrir la app de escritorio fallo. */
+  private desktopAppMissing = false
   private readonly disposables: vscode.Disposable[] = []
 
   constructor(private readonly deps: ControllerDeps) {
     this.settings = deps.readSettings()
     this.disposables.push(
       deps.state.onDidChange(() => this.render()),
-      deps.state.onTerminalLash(event =>
-        this.panel?.postLash({
-          id: event.id,
-          target: event.target,
-          combo: event.combo,
-          comboTitle: comboTitle(event.combo),
-          total: event.total,
-          levelUp: false,
-          reachedSession: true,
-          // El sonido ya lo pone la terminal.
-          sound: false,
-          source: 'terminal',
-        }),
-      ),
-      deps.lashes.onDidLash(result => this.panel?.postLash(animationFor(result))),
+      deps.state.onExternalLash(event => this.panel?.postLash(animationForExternal(event))),
+      deps.lashes.onDidLash(result => this.panel?.postLash(animationForResult(result))),
     )
   }
 
@@ -81,8 +69,9 @@ export class LatigoController implements PanelHost, vscode.Disposable {
 
   /** Repinta la barra de estado, el contexto de los botones y el panel. */
   render(): void {
-    const { config, stats } = this.deps.state.snapshot
-    this.deps.statusBar.update(config.enabled, stats.total, this.settings.showStatusBar)
+    const { config, stats, desktop } = this.deps.state.snapshot
+    if (desktop.alive) this.desktopAppMissing = false
+    this.deps.statusBar.update(config.enabled, stats.total, desktop, this.settings.showStatusBar)
     void vscode.commands.executeCommand('setContext', CONTEXT_ENABLED, config.enabled)
     void vscode.commands.executeCommand('setContext', CONTEXT_SOUND, config.sound)
     this.panel?.postState(this.currentState())
@@ -90,7 +79,10 @@ export class LatigoController implements PanelHost, vscode.Disposable {
 
   currentState(): ViewState {
     const now = this.deps.clock.now()
-    return buildViewState(this.deps.state.snapshot, this.settings, now, this.deps.clock.timezoneOffsetMinutes(now))
+    return buildViewState(this.deps.state.snapshot, this.settings, now, this.deps.clock.timezoneOffsetMinutes(now), {
+      supported: this.deps.desktopApp.supported,
+      appMissing: this.desktopAppMissing,
+    })
   }
 
   handleMessage(message: WebviewMessage): void {
@@ -106,6 +98,15 @@ export class LatigoController implements PanelHost, vscode.Disposable {
         return
       case 'installPlugin':
         this.installClaudePlugin()
+        return
+      case 'toggleWhipMode':
+        this.toggleWhipMode({ fromPanel: true })
+        return
+      case 'openDesktopApp':
+        void this.openDesktopApp({ fromPanel: true })
+        return
+      case 'openInstallGuide':
+        void this.openInstallGuide()
         return
       case 'ready':
         return
@@ -202,6 +203,70 @@ export class LatigoController implements PanelHost, vscode.Disposable {
     ].join(' · ')
     const choice = await vscode.window.showInformationMessage(`Látigo — ${summary}`, 'Abrir panel')
     if (choice === 'Abrir panel') await this.open()
+  }
+
+  /**
+   * Le pide a la app de escritorio prender o apagar el modo latigo (el puntero
+   * hecho latigo). Devuelve el pedido escrito, o null si no se pudo pedir.
+   */
+  toggleWhipMode(options: { fromPanel: boolean } = { fromPanel: false }): WhipModeRequest | null {
+    // Se relee para no decidir con una foto de hace un par de segundos.
+    this.deps.state.refresh('desktop')
+    const { config, desktop } = this.deps.state.snapshot
+    if (!config.enabled) {
+      void vscode.window.showInformationMessage('El látigo está apagado. Préndelo con «Látigo: Encender/Apagar».')
+      return null
+    }
+    if (!this.deps.desktopApp.supported) {
+      void vscode.window.showInformationMessage('El modo látigo en pantalla está disponible por ahora solo en Mac.')
+      return null
+    }
+    if (!desktop.alive) {
+      // Desde el panel ya se ve el boton para abrir la app.
+      if (!options.fromPanel) void this.offerToOpenDesktopApp()
+      return null
+    }
+    try {
+      const request = this.deps.store.requestWhipMode(!desktop.whipMode)
+      if (!options.fromPanel) {
+        void vscode.window.setStatusBarMessage(request.active ? '$(zap) Prendiendo el modo látigo…' : 'Apagando el modo látigo…', 2500)
+      }
+      return request
+    } catch (error) {
+      this.reportDiskError(error)
+      return null
+    }
+  }
+
+  private async offerToOpenDesktopApp(): Promise<void> {
+    const choice = await vscode.window.showInformationMessage('La app de escritorio del látigo no está abierta.', OPEN_APP)
+    if (choice === OPEN_APP) await this.openDesktopApp()
+  }
+
+  /** Abre la app de escritorio. Si no esta instalada, el panel lo dice y apunta a la guia. */
+  async openDesktopApp(options: { fromPanel: boolean } = { fromPanel: false }): Promise<boolean> {
+    if (!this.deps.desktopApp.supported) {
+      void vscode.window.showInformationMessage('La app de escritorio del látigo está disponible por ahora solo en Mac.')
+      return false
+    }
+    try {
+      await this.deps.desktopApp.launch()
+      this.desktopAppMissing = false
+      this.render()
+      return true
+    } catch {
+      this.desktopAppMissing = true
+      this.render()
+      if (!options.fromPanel) {
+        const choice = await vscode.window.showWarningMessage('No se encontró la app «Látigo» en este Mac.', INSTALL_GUIDE)
+        if (choice === INSTALL_GUIDE) await this.openInstallGuide()
+      }
+      return false
+    }
+  }
+
+  async openInstallGuide(): Promise<void> {
+    await vscode.env.openExternal(vscode.Uri.parse(DESKTOP_APP_INSTALL_URL))
   }
 
   installClaudePlugin(): void {

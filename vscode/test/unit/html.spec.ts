@@ -33,9 +33,34 @@ describe('HTML del panel', () => {
   })
 
   it('trae los textos clave en espanol con tildes', () => {
-    for (const text of ['Látigo encendido', 'Sonido', 'Top global', 'Próximamente', 'Ranking con apodo entre todos los que usan el látigo. Llega en una próxima versión.', 'Abre Claude Code para que el effort suba', 'Tus mejores días', 'El látigo está guardado']) {
+    for (const text of [
+      'Látigo encendido',
+      'Sonido',
+      'Modo látigo en pantalla',
+      'Activar modo látigo',
+      'Atajo: <kbd>Ctrl+Cmd+L</kbd> · <kbd>Esc</kbd> para salir',
+      'La app de escritorio no está abierta',
+      'Abrir la app',
+      'No se encontró la app «Látigo» en este Mac.',
+      'Disponible por ahora solo en Mac',
+      'La app de escritorio convierte tu puntero en un látigo: cada clic sobre una conversación de Claude le sube el effort.',
+      'Sesión de Claude Code',
+      'Latigazo al effort',
+      'Al modelo',
+      'Top global',
+      'Próximamente',
+      'Ranking con apodo entre todos los que usan el látigo. Llega en una próxima versión.',
+      'Abre Claude Code para que el effort suba',
+      'Tus mejores días',
+      'El látigo está guardado',
+    ]) {
       assert.ok(html.includes(text), `falta «${text}»`)
     }
+  })
+
+  it('ya no trae el escenario grande ni los blancos, sino la vista previa compacta', () => {
+    assert.doesNotMatch(html, /id="stage"|class="target/)
+    assert.match(html, /<div class="preview" id="preview">\s*<canvas id="whip-canvas"/)
   })
 
   it('el top global esta deshabilitado y con filas de relleno', () => {

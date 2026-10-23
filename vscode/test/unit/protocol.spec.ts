@@ -10,6 +10,9 @@ describe('parseWebviewMessage', () => {
     assert.deepEqual(parseWebviewMessage({ type: 'setEnabled', enabled: false }), { type: 'setEnabled', enabled: false })
     assert.deepEqual(parseWebviewMessage({ type: 'setSound', sound: true }), { type: 'setSound', sound: true })
     assert.deepEqual(parseWebviewMessage({ type: 'installPlugin' }), { type: 'installPlugin' })
+    assert.deepEqual(parseWebviewMessage({ type: 'toggleWhipMode' }), { type: 'toggleWhipMode' })
+    assert.deepEqual(parseWebviewMessage({ type: 'openDesktopApp' }), { type: 'openDesktopApp' })
+    assert.deepEqual(parseWebviewMessage({ type: 'openInstallGuide' }), { type: 'openInstallGuide' })
   })
 
   const rejected: Array<[string, unknown]> = [
@@ -30,6 +33,10 @@ describe('parseWebviewMessage', () => {
     ['setSound con numero', { type: 'setSound', sound: 1 }],
     ['ready con carga', { type: 'ready', path: '/etc/passwd' }],
     ['installPlugin con comando', { type: 'installPlugin', command: 'rm -rf /' }],
+    ['toggleWhipMode con estado', { type: 'toggleWhipMode', active: true }],
+    ['openDesktopApp con otra app', { type: 'openDesktopApp', app: 'Terminal' }],
+    ['openInstallGuide con url', { type: 'openInstallGuide', url: 'https://example.com' }],
+    ['toggleWhipMode con mayusculas', { type: 'ToggleWhipMode' }],
     ['prototipo envenenado', JSON.parse('{"type":"ready","__proto__":{"x":1}}') as unknown],
   ]
 

@@ -45,6 +45,26 @@ calma / apagar  ──►  /effort <el de antes>       (solo si nadie lo cambió
 - **Al arrancar**, el plugin lee el effort guardado para el modelo en `~/.claude/settings.json` para mostrarlo en la banda antes del primer pedido.
 - **Claude Code guarda `/effort` como predeterminado** para sesiones nuevas (salvo `max`), y calmar el látigo lo devuelve.
 
+## App de escritorio (`desktop/`)
+
+Una app de Mac en Swift, sin dependencias, que dibuja el látigo encima de toda la pantalla.
+
+| Archivo | Responsabilidad |
+|---|---|
+| `Model.swift` | Conteos, combos y niveles. Los niveles se leen de `Resources/niveles.json`, que `build.sh` genera de `hooks/levels.ts`; las pruebas comprueban que la interpolación de colores da lo mismo que en TypeScript. |
+| `Physics.swift` | La cuerda (Verlet con restricciones de largo): la punta en el puntero, el mango con resorte y sin pasar el largo de la cuerda, y la onda del latigazo. También los efectos del golpe. |
+| `Synth.swift` | El sonido de cada golpe, sintetizado en el momento (zumbido, onda de choque, doble chasquido, caída, eco). |
+| `Renderer.swift` | Dibuja cuerda, mango, mecha y efectos en un `CGContext`. Lo usan las ventanas y el modo `--demo`. |
+| `System.swift` | Atajos globales (Carbon), qué app hay debajo del clic, audio y las ventanas transparentes. |
+| `Bridge.swift` | Los mismos archivos de `~/.claude-latigo/`. |
+| `AppController.swift` | El modo látigo, los golpes, el menú y la revisión del puente. |
+
+Cómo funciona el modo látigo:
+
+- **Ventanas:** son transparentes, van sobre todo (nivel *screen saver*, en todos los escritorios) e **ignoran el mouse**, así que los clics pasan a la app de abajo. La app sigue la posición del puntero cuadro a cuadro y escucha los clics con un monitor global (los de mouse no piden permisos).
+- **Effort:** si debajo del clic hay una ventana de VS Code, una terminal o la app de Claude (por el nombre de su dueño, que no pide grabar la pantalla), el golpe suma en `stats.json` y, si hay una sesión viva, sube `effort.json`. El plugin lo aplica con `/effort`.
+- **VS Code** pide prender o apagar el modo con `whipmode.json`, y la app avisa su estado en `desktop.json` cada 2 s.
+
 ## Claude Code en VS Code
 
 El chat de Claude Code en VS Code (versión 2.1.293) no dibuja interfaz de plugins: su código no tiene `ui_render`, y VS Code no deja que otra extensión dibuje ni escuche clics dentro de su ventana. Por eso:

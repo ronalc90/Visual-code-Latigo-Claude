@@ -27,6 +27,25 @@ describe('formatStatusBar', () => {
     assert.equal(lines[4], 'Clic para abrir el panel')
   })
 
+  it('con el modo latigo activo lo dice en el texto y en el tooltip', () => {
+    const content = formatStatusBar(true, TIERS[4]!.minLashes, { alive: true, whipMode: true })
+    assert.equal(content.text, '$(zap) Modo látigo · Nv 5')
+    assert.equal(content.tooltip.split('\n')[1], 'Modo látigo en pantalla: activo (Esc para salir)')
+  })
+
+  it('con la app abierta pero el modo apagado, solo el tooltip lo menciona', () => {
+    const content = formatStatusBar(true, 0, { alive: true, whipMode: false })
+    assert.equal(content.text, '$(flame) Látigo · Nv 1')
+    assert.equal(content.tooltip.split('\n')[1], 'Modo látigo en pantalla: apagado')
+  })
+
+  it('con la app cerrada o el latigo apagado no se habla del modo latigo', () => {
+    assert.doesNotMatch(formatStatusBar(true, 0, { alive: false, whipMode: false }).tooltip, /Modo látigo/)
+    const off = formatStatusBar(false, 0, { alive: true, whipMode: true })
+    assert.equal(off.text, '$(circle-slash) Látigo · apagado')
+    assert.doesNotMatch(off.tooltip, /Modo látigo/)
+  })
+
   it('singular y miles con punto', () => {
     assert.match(formatStatusBar(true, 1).tooltip, /Total: 1 latigazo\n/)
     assert.match(formatStatusBar(true, TIERS[1]!.minLashes - 1).tooltip, /faltan 1 latigazo para/)

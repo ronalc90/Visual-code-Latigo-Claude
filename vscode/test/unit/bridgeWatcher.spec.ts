@@ -28,6 +28,17 @@ describe('BridgeWatcher', function () {
     await waitFor(() => seen.includes('config'))
     bridge.store.incrementEffortSeq(1)
     await waitFor(() => seen.includes('effort'))
+    fs.writeFileSync(bridge.store.paths.desktop, JSON.stringify({ at: 1, whipMode: true }))
+    await waitFor(() => seen.includes('desktop'))
+  })
+
+  it('no vigila whipmode.json: lo escribe la propia extension', async () => {
+    const seen: BridgeFile[] = []
+    watcher = new BridgeWatcher(bridge.store.paths, file => seen.push(file), { debounceMs: 20, pollIntervalMs: 50 })
+    watcher.start()
+    bridge.store.requestWhipMode(true)
+    await new Promise(resolve => setTimeout(resolve, 250))
+    assert.deepEqual(seen, [])
   })
 
   it('agrupa varias escrituras seguidas en un solo aviso (debounce)', async () => {

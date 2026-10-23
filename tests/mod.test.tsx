@@ -123,7 +123,8 @@ describe('la banda', () => {
       await w.clock.advance(1000)
 
       expect(await ui.find({ key: 'effort' })).toMatchObject({ props: { label: 'effort: high ⚡' } })
-      expect(w.sounds).toEqual(['assets/latigo.wav'])
+      expect(w.sounds).toHaveLength(1)
+      expect(w.sounds[0]).toMatch(/^assets\/latigo(-[23])?\.wav$/)
       expect(json(w, 'stats.json')).toMatchObject({ stats: { total: 1, onEffort: 1 } })
       expect(json(w, 'lash.json')).toMatchObject({ target: 'effort', source: 'terminal', total: 1, combo: 1 })
       expect(json(w, 'presence.json')).toMatchObject({ boost: 'high' })

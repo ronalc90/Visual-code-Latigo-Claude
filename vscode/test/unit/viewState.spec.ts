@@ -15,6 +15,7 @@ describe('buildViewState', () => {
       byDay: { '2026-10-15': 3, '2026-10-16': 9, '2026-10-17': 9, '2026-10-18': 1, '2026-10-19': 20, '2026-10-20': 8, '2026-10-22': 10 },
     },
     session: { alive: true, model: 'claude-opus-5-5', effort: 'high', boost: 'max' },
+    desktop: { alive: true, whipMode: true },
   }
 
   it('arma el estado del panel con hoy en dia local y el top 5', () => {
@@ -33,6 +34,20 @@ describe('buildViewState', () => {
     assert.equal(view.volume, 0.3)
     assert.equal(view.reducedMotion, 'auto')
     assert.deepEqual(view.session, snapshot.session)
+  })
+
+  it('trae la app de escritorio; sin decir nada, se asume que no existe para el sistema', () => {
+    const view = buildViewState(snapshot, DEFAULT_SETTINGS, Date.UTC(2026, 9, 22, 12), 300)
+    assert.deepEqual(view.desktop, { supported: false, alive: true, whipMode: true, appMissing: false })
+    const mac = buildViewState(snapshot, DEFAULT_SETTINGS, Date.UTC(2026, 9, 22, 12), 300, { supported: true, appMissing: false })
+    assert.equal(mac.desktop.supported, true)
+  })
+
+  it('«no instalada» solo se muestra mientras la app siga cerrada', () => {
+    const missing = { supported: true, appMissing: true }
+    assert.equal(buildViewState(snapshot, DEFAULT_SETTINGS, 0, 0, missing).desktop.appMissing, false)
+    const closed: BridgeSnapshot = { ...snapshot, desktop: { alive: false, whipMode: false } }
+    assert.equal(buildViewState(closed, DEFAULT_SETTINGS, 0, 0, missing).desktop.appMissing, true)
   })
 
   it('un dia sin latigazos da cero', () => {

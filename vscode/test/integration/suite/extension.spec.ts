@@ -59,7 +59,7 @@ describe('Látigo en VS Code', () => {
 
   beforeEach(async () => {
     // Cada prueba arranca encendida, con sonido, sin pedidos de effort ni sesion.
-    for (const name of ['effort.json', 'lash.json', 'presence.json']) fs.rmSync(bridgeFile(api, name), { force: true })
+    for (const name of ['effort.json', 'lash.json', 'presence.json', 'desktop.json', 'whipmode.json']) fs.rmSync(bridgeFile(api, name), { force: true })
     await vscode.commands.executeCommand(COMMANDS.turnOn)
     await vscode.commands.executeCommand(COMMANDS.soundOn)
   })
@@ -78,17 +78,17 @@ describe('Látigo en VS Code', () => {
 
   it('declara el atajo de encender/apagar', () => {
     const manifest = vscode.extensions.getExtension(EXTENSION_ID)!.packageJSON as {
-      contributes: { keybindings: Array<{ command: string; key: string; mac: string }> }
+      contributes: { keybindings: Array<{ command: string; key: string; mac?: string }> }
     }
     const binding = manifest.contributes.keybindings.find(item => item.command === COMMANDS.toggle)
-    assert.deepEqual(binding, { command: COMMANDS.toggle, key: 'shift+alt+l', mac: 'ctrl+cmd+l' })
+    assert.deepEqual(binding, { command: COMMANDS.toggle, key: 'shift+alt+l' })
   })
 
   it('el atajo no choca con los atajos de fabrica de VS Code', async function () {
     await vscode.commands.executeCommand('workbench.action.openDefaultKeybindingsFile')
     await waitFor(() => vscode.window.activeTextEditor?.document.getText().includes('"key"') === true)
     const text = vscode.window.activeTextEditor!.document.getText()
-    const key = process.platform === 'darwin' ? 'ctrl+cmd+l' : 'shift+alt+l'
+    const key = 'shift+alt+l'
     const taken = text.split('\n').filter(line => line.includes(`"key": "${key}"`) && !line.includes('latigo.'))
     assert.deepEqual(taken, [], `${key} ya lo usa VS Code`)
     await vscode.commands.executeCommand('workbench.action.closeActiveEditor')
@@ -185,6 +185,79 @@ describe('Látigo en VS Code', () => {
     await config.update('showStatusBar', false, vscode.ConfigurationTarget.Global)
     await config.update('showStatusBar', undefined, vscode.ConfigurationTarget.Global)
     assert.match(api.statusBarText(), /Látigo/)
+  })
+
+  describe('modo latigo en pantalla (app de escritorio)', () => {
+    const desktopAlive = async (whipMode: boolean) => {
+      writeBridge(api, 'desktop.json', { version: 1, at: Date.now(), whipMode })
+      await waitFor(() => api.snapshot().desktop.alive && api.snapshot().desktop.whipMode === whipMode)
+    }
+
+    it('sin la app abierta no escribe ningun pedido', async () => {
+      await waitFor(() => !api.snapshot().desktop.alive)
+      assert.equal(await vscode.commands.executeCommand(COMMANDS.toggleWhipMode), null)
+      assert.equal(fs.existsSync(bridgeFile(api, 'whipmode.json')), false)
+    })
+
+    it('latigo.toggleWhipMode escribe whipmode.json con el contador subiendo', async function () {
+      if (process.platform !== 'darwin') this.skip()
+      await desktopAlive(false)
+      assert.deepEqual(await vscode.commands.executeCommand(COMMANDS.toggleWhipMode), { seq: 1, active: true })
+      assert.deepEqual(readJson(bridgeFile(api, 'whipmode.json')), { version: 1, seq: 1, active: true })
+      // La app confirma que lo prendio: el siguiente pedido es apagarlo.
+      await desktopAlive(true)
+      assert.deepEqual(await vscode.commands.executeCommand(COMMANDS.toggleWhipMode), { seq: 2, active: false })
+      assert.deepEqual(readJson(bridgeFile(api, 'whipmode.json')), { version: 1, seq: 2, active: false })
+    })
+
+    it('apagado el latigo, no pide nada', async () => {
+      await desktopAlive(false)
+      await vscode.commands.executeCommand(COMMANDS.turnOff)
+      assert.equal(await vscode.commands.executeCommand(COMMANDS.toggleWhipMode), null)
+      assert.equal(fs.existsSync(bridgeFile(api, 'whipmode.json')), false)
+    })
+
+    it('la presencia de la app llega al panel y a la barra de estado', async () => {
+      await desktopAlive(true)
+      assert.deepEqual(
+        { alive: api.viewState().desktop.alive, whipMode: api.viewState().desktop.whipMode, supported: api.viewState().desktop.supported },
+        { alive: true, whipMode: true, supported: process.platform === 'darwin' },
+      )
+      assert.match(api.statusBarText(), /^\$\(zap\) Modo látigo · Nv \d+$/)
+      await desktopAlive(false)
+      assert.match(api.statusBarText(), /^\$\(flame\) Látigo · Nv \d+$/)
+      // Si la app deja de escribir, a los pocos segundos se da por cerrada.
+      writeBridge(api, 'desktop.json', { version: 1, at: Date.now() - 60_000, whipMode: true })
+      await waitFor(() => !api.snapshot().desktop.alive)
+      assert.equal(api.viewState().desktop.whipMode, false)
+    })
+  })
+
+  describe('latigazos de afuera en el panel', () => {
+    before(async () => {
+      await vscode.commands.executeCommand(COMMANDS.open)
+      await waitFor(() => api.panelReady(), 15000)
+    })
+
+    for (const source of ['desktop', 'terminal'] as const) {
+      it(`un latigazo desde ${source === 'desktop' ? 'la pantalla' : 'la terminal'} se anima con el grito del combo`, async () => {
+        const id = `${source}-${Date.now()}`
+        writeBridge(api, 'lash.json', { version: 1, id, at: Date.now(), target: 'effort', combo: 3, total: 50, source })
+        await waitFor(() => api.lastPanelLash()?.id === id)
+        const lash = api.lastPanelLash()!
+        assert.equal(lash.source, source)
+        assert.equal(lash.combo, 3)
+        assert.equal(lash.comboTitle, '¡TRIPLE!')
+        assert.equal(lash.sound, false)
+      })
+    }
+
+    it('los latigazos de VS Code no se reenvian desde lash.json (ya los anima el panel)', async () => {
+      const before = api.lastPanelLash()
+      writeBridge(api, 'lash.json', { version: 1, id: `vscode-${Date.now()}`, at: Date.now(), target: 'model', combo: 1, total: 51, source: 'vscode' })
+      await new Promise(resolve => setTimeout(resolve, 1200))
+      assert.equal(api.lastPanelLash(), before)
+    })
   })
 
   describe('al entrar a una conversacion de Claude Code', () => {

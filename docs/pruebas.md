@@ -1,13 +1,14 @@
 # Pruebas
 
-Son cuatro capas, de la regla más chica al programa real funcionando. Todas pasan en la versión 0.3.0.
+Son cinco capas, de la regla más chica al programa real funcionando. Todas pasan en la versión 0.4.0.
 
 | Capa | Dónde | Cuántas | Cómo se corre |
 |---|---|---:|---|
-| Reglas compartidas y banda | `tests/rules.test.ts` | 42 | `claude plugin test ./` |
+| Reglas compartidas y banda | `tests/rules.test.ts` | 43 | `claude plugin test ./` |
 | Plugin de Claude Code | `tests/mod.test.tsx` | 56 | `claude plugin test ./` |
-| Extensión, unitarias | `vscode/test/unit/` | 121 | `cd vscode && npm run test:unit` |
-| Extensión, integración (VS Code real) | `vscode/test/integration/` | 19 | `cd vscode && npm run test:integration` |
+| Extensión, unitarias | `vscode/test/unit/` | 147 | `cd vscode && npm run test:unit` |
+| Extensión, integración (VS Code real) | `vscode/test/integration/` | 26 |
+| App de escritorio | `desktop/Tests/main.swift` | 98 comprobaciones | `desktop/build.sh --test` | `cd vscode && npm run test:integration` |
 | Punta a punta con Claude Code real | `scripts/e2e_puente.py` | 22 | `python scripts/e2e_puente.py --claude "$(which claude)"` |
 
 Además, `claude plugin validate ./` revisa el manifiesto, el marketplace y los hooks, y los dos lados pasan la revisión de tipos de TypeScript en modo estricto.
@@ -81,6 +82,16 @@ Corre el plugin dentro del motor de pruebas de Claude Code, con el disco, el rel
   - Los latigazos dados en VS Code se cuentan y se animan.
   - Los archivos rotos no tumban nada, y sin `HOME` funciona solo en la sesión.
 - **`/latigo`:** la tabla, `on`, `off`, `sonido`, `calma` y `ayuda`.
+
+## App de escritorio (`desktop/Tests/main.swift`)
+
+- **Niveles:** los 14 salen de `levels.ts`, y la interpolación de colores y chispas da lo mismo que `lookFor` en TypeScript.
+- **Reglas:** combos, conteos y fusión por el mayor.
+- **La cuerda:** con movimientos bruscos y latigazos fuertes, la punta va en el puntero, no aparecen valores inválidos, el largo se mantiene y el mango descansa abajo a la derecha.
+- **El golpe:** más chispas con más nivel y combo, menos con movimiento reducido, y todo se apaga solo.
+- **El sonido:** dos golpes iguales suenan distinto, no satura, el chasquido llega después del zumbido y un tirón rápido truena antes.
+- **Dónde sube el effort:** solo sobre VS Code, terminales o Claude.
+- **El puente con archivos reales:** sin sesión no pide effort y con sesión sí; un `stats.json` roto no baja los conteos; presencia y pedido del modo látigo.
 
 ## Extensión de VS Code
 
