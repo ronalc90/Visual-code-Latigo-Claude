@@ -1,0 +1,250 @@
+{
+  "name": "latigo-claude",
+  "displayName": "Látigo para Claude Code",
+  "description": "Un látigo para Claude Code dentro de VS Code: latigazos animados con sonido, combos, niveles que se van dorando y un clic al effort para subirlo.",
+  "version": "0.2.0",
+  "publisher": "ronalc90",
+  "author": {
+    "name": "Ronald Cipagauta",
+    "url": "https://github.com/ronalc90"
+  },
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#1b1410",
+    "theme": "dark"
+  },
+  "categories": [
+    "AI",
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "claude code",
+    "látigo",
+    "latigo",
+    "whip",
+    "effort",
+    "combo",
+    "fun",
+    "gamification"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ronalc90/Visual-code-Latigo-Claude",
+    "directory": "vscode"
+  },
+  "homepage": "https://github.com/ronalc90/Visual-code-Latigo-Claude/tree/main/vscode#readme",
+  "bugs": {
+    "url": "https://github.com/ronalc90/Visual-code-Latigo-Claude/issues"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "latigo.open",
+        "title": "Abrir el panel",
+        "category": "Látigo",
+        "icon": "$(flame)"
+      },
+      {
+        "command": "latigo.toggle",
+        "title": "Encender/Apagar",
+        "category": "Látigo"
+      },
+      {
+        "command": "latigo.turnOn",
+        "title": "Encender",
+        "category": "Látigo",
+        "icon": "$(circle-slash)"
+      },
+      {
+        "command": "latigo.turnOff",
+        "title": "Apagar",
+        "category": "Látigo",
+        "icon": "$(flame)"
+      },
+      {
+        "command": "latigo.lashEffort",
+        "title": "Latigazo al effort",
+        "category": "Látigo",
+        "icon": "$(zap)"
+      },
+      {
+        "command": "latigo.lashModel",
+        "title": "Latigazo al modelo",
+        "category": "Látigo"
+      },
+      {
+        "command": "latigo.toggleSound",
+        "title": "Prender/Apagar el sonido",
+        "category": "Látigo"
+      },
+      {
+        "command": "latigo.soundOn",
+        "title": "Prender el sonido",
+        "category": "Látigo",
+        "icon": "$(mute)"
+      },
+      {
+        "command": "latigo.soundOff",
+        "title": "Apagar el sonido",
+        "category": "Látigo",
+        "icon": "$(unmute)"
+      },
+      {
+        "command": "latigo.showStats",
+        "title": "Ver mis latigazos",
+        "category": "Látigo",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "latigo.installClaudePlugin",
+        "title": "Instalar el plugin en Claude Code",
+        "category": "Látigo",
+        "icon": "$(terminal)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "latigo.toggle",
+        "key": "shift+alt+l",
+        "mac": "ctrl+cmd+l"
+      }
+    ],
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "latigo",
+          "title": "Látigo",
+          "icon": "images/whip.svg"
+        }
+      ]
+    },
+    "views": {
+      "latigo": [
+        {
+          "type": "webview",
+          "id": "latigo.panel",
+          "name": "Látigo",
+          "icon": "images/whip.svg",
+          "contextualTitle": "Látigo"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "latigo.turnOff",
+          "when": "view == latigo.panel && latigo.enabled",
+          "group": "navigation@1"
+        },
+        {
+          "command": "latigo.turnOn",
+          "when": "view == latigo.panel && !latigo.enabled",
+          "group": "navigation@1"
+        },
+        {
+          "command": "latigo.soundOff",
+          "when": "view == latigo.panel && latigo.sound",
+          "group": "navigation@2"
+        },
+        {
+          "command": "latigo.soundOn",
+          "when": "view == latigo.panel && !latigo.sound",
+          "group": "navigation@2"
+        },
+        {
+          "command": "latigo.showStats",
+          "when": "view == latigo.panel",
+          "group": "navigation@3"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "latigo.turnOn",
+          "when": "false"
+        },
+        {
+          "command": "latigo.turnOff",
+          "when": "false"
+        },
+        {
+          "command": "latigo.soundOn",
+          "when": "false"
+        },
+        {
+          "command": "latigo.soundOff",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Látigo",
+      "properties": {
+        "latigo.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "order": 1,
+          "markdownDescription": "Muestra el nivel del látigo en la barra de estado (abajo a la derecha). Un clic abre el panel."
+        },
+        "latigo.reducedMotion": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "on",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Sigue la preferencia del sistema operativo (`prefers-reduced-motion`).",
+            "Siempre con movimiento reducido: menos partículas y sin sacudidas.",
+            "Siempre con todas las animaciones."
+          ],
+          "default": "auto",
+          "order": 2,
+          "markdownDescription": "Cuánto se mueve el panel al dar un latigazo."
+        },
+        "latigo.volume": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 1,
+          "order": 3,
+          "markdownDescription": "Volumen del latigazo y de la subida de nivel en el panel, de `0` a `1`. El sonido se prende y se apaga con el interruptor del panel."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "typecheck": "tsc -p . --noEmit",
+    "test": "npm run typecheck && npm run build && npm run test:unit && npm run test:integration",
+    "test:unit": "node scripts/build.mjs --tests && mocha --ui bdd \"out/test/unit/**/*.spec.js\"",
+    "test:integration": "node scripts/build.mjs --tests && node out/test/integration/runTest.js",
+    "screenshots": "node scripts/build.mjs && node scripts/screenshots.mjs",
+    "icon": "python3 scripts/make-icon.py",
+    "vscode:prepublish": "node scripts/build.mjs --production",
+    "package": "vsce package --baseContentUrl https://github.com/ronalc90/Visual-code-Latigo-Claude/blob/main/vscode --baseImagesUrl https://github.com/ronalc90/Visual-code-Latigo-Claude/raw/main/vscode",
+    "list": "vsce ls"
+  },
+  "devDependencies": {
+    "@types/mocha": "10.0.10",
+    "@types/node": "18.19.130",
+    "@types/vscode": "1.85.0",
+    "@vscode/test-electron": "2.5.2",
+    "@vscode/vsce": "2.32.0",
+    "esbuild": "0.24.2",
+    "mocha": "10.8.2",
+    "typescript": "5.6.3"
+  },
+  "overrides": {
+    "cheerio": "1.0.0"
+  }
+}

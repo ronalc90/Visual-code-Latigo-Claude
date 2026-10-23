@@ -1,0 +1,13 @@
+# Solo se publica lo empaquetado: dist/, media/, el icono y la documentacion.
+**
+!package.json
+!README.md
+!CHANGELOG.md
+!LICENSE
+!dist/extension.js
+!dist/webview.js
+!dist/webview.css
+!media/latigo.wav
+!media/nivel.wav
+!images/icon.png
+!images/whip.svg

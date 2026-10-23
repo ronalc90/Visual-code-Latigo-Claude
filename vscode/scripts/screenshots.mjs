@@ -1,0 +1,215 @@
+// Capturas reales del panel para el README del Marketplace.
+//
+// Arma un HTML con el mismo markup del panel (src/panel/html.ts) y el mismo
+// bundle del webview (dist/webview.js), simula `acquireVsCodeApi` y los
+// colores del tema oscuro de VS Code, congela la animacion en un cuadro exacto
+// (modo ?demo= con semilla fija) y le saca la foto con Chrome sin ventana.
+//
+// Uso: npm run screenshots   (CHROME_PATH cambia el ejecutable de Chrome)
+
+import { execFileSync } from 'node:child_process'
+import { mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { buildSync } from 'esbuild'
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const work = join(root, 'out', 'screenshots')
+const target = join(root, 'images', 'screenshots')
+const chrome = process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+
+if (!existsSync(join(root, 'dist', 'webview.js'))) {
+  console.error('Falta dist/webview.js: corre primero npm run build')
+  process.exit(1)
+}
+
+rmSync(work, { recursive: true, force: true })
+mkdirSync(work, { recursive: true })
+mkdirSync(target, { recursive: true })
+
+// El HTML real del panel, compilado al vuelo.
+const htmlModule = join(work, 'html.cjs')
+buildSync({ entryPoints: [join(root, 'src/panel/html.ts')], outfile: htmlModule, bundle: true, platform: 'node', format: 'cjs', logLevel: 'warning' })
+const { renderPanelHtml } = createRequire(import.meta.url)(htmlModule)
+
+// Colores del tema "Dark Modern" de VS Code para las variables que usa el panel.
+writeFileSync(
+  join(work, 'theme-dark.css'),
+  `:root {
+  --vscode-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --vscode-font-size: 13px;
+  --vscode-editor-font-family: Menlo, Monaco, "Courier New", monospace;
+  --vscode-foreground: #cccccc;
+  --vscode-descriptionForeground: #9d9d9d;
+  --vscode-panel-background: #181818;
+  --vscode-editor-background: #1f1f1f;
+  --vscode-editorWidget-background: #202020;
+  --vscode-widget-border: #313131;
+  --vscode-panel-border: #2b2b2b;
+  --vscode-focusBorder: #0078d4;
+  --vscode-textLink-foreground: #4daafc;
+  --vscode-editorWarning-foreground: #cca700;
+  --vscode-notifications-background: #1f1f1f;
+  --vscode-notifications-foreground: #cccccc;
+}
+`,
+)
+
+const NONCE = 'capturasDelLatigo0123456789abcde'
+
+function day(offset) {
+  const date = new Date(Date.UTC(2026, 9, 22 - offset))
+  return date.toISOString().slice(0, 10)
+}
+
+function stats(total, onEffort, bestCombo, days) {
+  const byDay = {}
+  days.forEach((count, index) => {
+    byDay[day(index * 3 + 1)] = count
+  })
+  return { total, onModel: total - onEffort, onEffort, bestCombo, byDay }
+}
+
+function topOf(s) {
+  return Object.entries(s.byDay)
+    .sort(([a, x], [b, y]) => y - x || b.localeCompare(a))
+    .slice(0, 5)
+}
+
+function viewState({ enabled = true, sound = true, total, onEffort, bestCombo, days, today, session }) {
+  const s = stats(total, onEffort, bestCombo, days)
+  return {
+    enabled,
+    sound,
+    volume: 0.7,
+    reducedMotion: 'off',
+    stats: s,
+    today,
+    topDays: topOf(s),
+    session,
+  }
+}
+
+const opus = { alive: true, model: 'claude-opus-5-5', effort: 'high', boost: null }
+
+const lash = (id, target, combo, comboTitle, total, levelUp = false) => ({
+  type: 'lash',
+  lash: { id, target, combo, comboTitle, total, levelUp, reachedSession: true, sound: false, source: 'vscode' },
+})
+
+/**
+ * Lo que la extension manda tras un latigazo: la animacion y el estado ya
+ * contado (total, al effort o al modelo, hoy y mejor combo), como el host real.
+ */
+function lashed(base, id, target, combo, comboTitle, levelUp = false) {
+  base.total += 1
+  if (target === 'effort') base.onEffort += 1
+  base.today += 1
+  base.bestCombo = Math.max(base.bestCombo, combo)
+  return [lash(id, target, combo, comboTitle, base.total, levelUp), { type: 'state', state: viewState({ ...base }) }]
+}
+
+const nivel5 = { total: 247, onEffort: 171, bestCombo: 6, days: [41, 37, 30, 22, 18], today: 40, session: { ...opus, effort: 'medium', boost: 'high' } }
+const nivel9 = { total: 1412, onEffort: 1003, bestCombo: 14, days: [133, 120, 96, 88, 71], today: 93, session: { ...opus, effort: 'high', boost: 'xhigh' } }
+const nivel14 = { total: 6999, onEffort: 5120, bestCombo: 23, days: [402, 377, 351, 340, 298], today: 350, session: { ...opus, effort: 'xhigh', boost: 'max' } }
+
+// Cada escena: estado, latigazos y cuanto avanzar el reloj despues de cada uno.
+const scenes = [
+  {
+    file: 'nivel-1-reposo.png',
+    seed: 3,
+    size: [1280, 440],
+    state: viewState({ total: 9, onEffort: 6, bestCombo: 2, days: [5, 4], today: 5, session: opus }),
+    steps: [{ advance: 900 }],
+  },
+  {
+    file: 'nivel-5-latigazo.png',
+    seed: 11,
+    size: [1280, 480],
+    state: viewState({ ...nivel5 }),
+    steps: [{ advance: 400 }, { message: lashed(nivel5, 'a1', 'effort', 1, ''), advance: 370 }],
+  },
+  {
+    file: 'nivel-9-combo.png',
+    seed: 29,
+    size: [1280, 480],
+    state: viewState({ ...nivel9 }),
+    steps: [
+      { advance: 300 },
+      { message: lashed(nivel9, 'b1', 'effort', 1, ''), advance: 300 },
+      { message: lashed(nivel9, 'b2', 'effort', 2, '¡DOBLE!'), advance: 300 },
+      { message: lashed(nivel9, 'b3', 'effort', 3, '¡TRIPLE!'), advance: 265 },
+    ],
+  },
+  {
+    file: 'nivel-14-divino.png',
+    seed: 41,
+    size: [1280, 480],
+    state: viewState({ ...nivel14 }),
+    steps: [{ advance: 1200 }, { message: lashed(nivel14, 'c1', 'effort', 1, '', true), advance: 330 }],
+  },
+  {
+    file: 'sin-sesion.png',
+    seed: 5,
+    size: [1280, 480],
+    state: viewState({ total: 74, onEffort: 40, bestCombo: 4, days: [21, 18, 13, 9, 6], today: 21, session: { alive: false, model: null, effort: null, boost: null } }),
+    steps: [{ advance: 700 }],
+  },
+  {
+    file: 'apagado.png',
+    seed: 1,
+    size: [1280, 230],
+    state: viewState({ enabled: false, total: 1412, onEffort: 1003, bestCombo: 14, days: [133, 120], today: 96, session: opus }),
+    steps: [{ advance: 100 }],
+  },
+]
+
+for (const scene of scenes) {
+  const name = scene.file.replace(/\.png$/, '')
+  const driver = [
+    'window.__latigoDemo.receive(' + JSON.stringify({ type: 'state', state: scene.state }) + ');',
+    ...scene.steps.map(step => {
+      const messages = step.message === undefined ? [] : Array.isArray(step.message) ? step.message : [step.message]
+      return messages.map(message => `window.__latigoDemo.receive(${JSON.stringify(message)});`).join('') + `window.__latigoDemo.advance(${step.advance});`
+    }),
+  ].join('\n')
+  writeFileSync(join(work, `${name}.driver.js`), driver)
+  writeFileSync(join(work, 'mock.js'), 'window.acquireVsCodeApi = () => ({ postMessage() {} });\n')
+
+  let html = renderPanelHtml({
+    cspSource: 'file:',
+    nonce: NONCE,
+    scriptUri: '../../dist/webview.js',
+    styleUri: '../../dist/webview.css',
+    crackSoundUri: '',
+    levelSoundUri: '',
+  })
+  html = html
+    .replace('<link rel="stylesheet"', '<link rel="stylesheet" href="theme-dark.css">\n<link rel="stylesheet"')
+    .replace('<body ', '<body class="vscode-dark" ')
+    .replace(`<script nonce="${NONCE}" src=`, `<script nonce="${NONCE}" src="mock.js"></script>\n<script nonce="${NONCE}" src=`)
+    .replace('</body>', `<script nonce="${NONCE}" src="${name}.driver.js"></script>\n</body>`)
+  const page = join(work, `${name}.html`)
+  writeFileSync(page, html)
+
+  const out = join(target, scene.file)
+  const url = `${pathToFileURL(page).href}?demo=1&seed=${scene.seed}`
+  execFileSync(
+    chrome,
+    [
+      '--headless=new',
+      '--disable-gpu',
+      '--hide-scrollbars',
+      '--allow-file-access-from-files',
+      '--force-device-scale-factor=2',
+      '--force-prefers-reduced-motion=0',
+      `--window-size=${scene.size[0]},${scene.size[1]}`,
+      `--screenshot=${out}`,
+      '--virtual-time-budget=2000',
+      url,
+    ],
+    { stdio: 'pipe' },
+  )
+  console.log(`listo ${out}`)
+}
