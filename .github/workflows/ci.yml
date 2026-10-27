@@ -1,0 +1,140 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Un PR nuevo cancela la corrida anterior del mismo PR; en main corre cada commit.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # Claude Code con el que se generan los tipos del plugin y corren sus pruebas.
+  CLAUDE_CODE_VERSION: 2.1.311
+  # VS Code con el que corren las pruebas de integración de la extensión.
+  VSCODE_VERSION: 1.143.1
+
+jobs:
+  linux:
+    name: Plugin y extensión (Ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DISABLE_AUTOUPDATER: '1'
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: vscode/package-lock.json
+
+      - name: Instalar Claude Code
+        run: npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+
+      - name: Instalar dependencias de la extensión
+        working-directory: vscode
+        run: npm ci
+
+      # El motor escribe .claude-plugin/types/ (lo que extiende tsconfig.json)
+      # solo cuando una sesión interactiva carga el mod con --plugin-dir; no hay
+      # un comando para eso. Se abre Claude Code en una terminal virtual, sin
+      # cuenta y sin mandar ningún mensaje, se espera a que aparezcan y se cierra.
+      - name: Generar los tipos del plugin
+        env:
+          LATIGO_HOME: ${{ runner.temp }}/latigo
+        run: |
+          jq -n --arg dir "$PWD" \
+            '{hasCompletedOnboarding: true, projects: {($dir): {hasTrustDialogAccepted: true}}}' \
+            > "$HOME/.claude.json"
+          log="$RUNNER_TEMP/claude-tipos.log"
+          setsid script -q -c "claude --plugin-dir '$PWD'" /dev/null < /dev/null > "$log" 2>&1 &
+          pid=$!
+          for _ in $(seq 1 90); do
+            if [ -s .claude-plugin/types/tsconfig.json ] && [ -s .claude-plugin/types/claude-code/index.d.ts ]; then
+              break
+            fi
+            sleep 1
+          done
+          sleep 2
+          kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+          wait "$pid" 2>/dev/null || true
+          if [ ! -s .claude-plugin/types/claude-code/index.d.ts ]; then
+            echo "::error::Claude Code no escribió .claude-plugin/types/"
+            sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g' "$log" | tail -c 4000
+            exit 1
+          fi
+          ls -R .claude-plugin/types
+
+      - name: Revisar tipos del plugin
+        run: vscode/node_modules/.bin/tsc -p .
+
+      - name: Validar el plugin
+        run: claude plugin validate ./
+
+      - name: Pruebas del plugin
+        run: claude plugin test ./
+
+      - name: Revisar tipos de la extensión
+        working-directory: vscode
+        run: npm run typecheck
+
+      - name: Compilar la extensión
+        working-directory: vscode
+        run: npm run build
+
+      - name: Pruebas unitarias de la extensión
+        working-directory: vscode
+        run: npm run test:unit
+
+      - name: Caché de VS Code
+        uses: actions/cache@v5
+        with:
+          path: vscode/.vscode-test
+          key: vscode-${{ runner.os }}-${{ env.VSCODE_VERSION }}
+
+      - name: Descargar VS Code
+        working-directory: vscode
+        run: |
+          node -e "
+            require('@vscode/test-electron')
+              .downloadAndUnzipVSCode(process.env.VSCODE_VERSION)
+              .then(p => require('fs').appendFileSync(process.env.GITHUB_ENV, 'VSCODE_EXECUTABLE=' + p + '\n'))
+              .catch(e => { console.error(e); process.exit(1) })
+          "
+
+      # Las pruebas de integración abren un VS Code de verdad: en Linux necesitan
+      # una pantalla virtual.
+      - name: Pruebas de integración de la extensión
+        working-directory: vscode
+        run: |
+          command -v xvfb-run >/dev/null || { sudo apt-get update && sudo apt-get install -y xvfb; }
+          xvfb-run -a npm run test:integration
+
+  macos:
+    name: App de escritorio (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Versión de Swift
+        run: swiftc --version
+
+      # build.sh firma ad hoc (codesign --sign -): no necesita certificados.
+      - name: Compilar la app y correr sus pruebas
+        run: desktop/build.sh --test
+
+      - name: Los JSON de desktop/Resources están al día
+        run: git diff --exit-code -- desktop/Resources
