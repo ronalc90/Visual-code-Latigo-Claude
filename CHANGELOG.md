@@ -1,5 +1,17 @@
 # Cambios
 
+## 0.5.1 · 2026-10-26
+
+El látigo se sostiene por el mango.
+
+### App de escritorio
+- **El puntero sostiene el mango**, por el pomo, y la cuerda cuelga con gravedad y se mece. Antes el puntero sostenía la punta.
+- **La punta revienta lejos de la mano**, hacia donde movías el mouse o, quieto, hacia donde apunta el mango. Si el golpe fuera a caer fuera de la pantalla, sale hacia el otro lado o más acostado, con lugar para el grito y la insignia.
+- La muñeca apunta el mango hacia el lanzamiento, y si mueves la mano durante el latigazo, el látigo va con ella.
+- El effort sube si el clic **o** el golpe caen sobre Claude.
+- La cuerda colgada se queda quieta enseguida: la corrección que impide que se estire ya no le mete energía.
+- 209 comprobaciones.
+
 ## 0.5.0 · 2026-10-23
 
 Un solo interruptor, un latigazo de verdad y el sonido de un látigo real.

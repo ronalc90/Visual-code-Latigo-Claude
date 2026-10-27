@@ -62,16 +62,27 @@ func bending(_ points: [Vec]) -> (turn: Double, signChanges: Int) {
     return (abs(turn), changes)
 }
 
-/// Mueve la punta por `path(t)` durante `seconds`, como lo hace la app.
-func drive(_ rope: inout Rope, motion: inout MotionTracker, time: inout Double, seconds: Double, side: inout Double, _ path: (Double) -> Vec) {
+/// Mueve la mano por `path(t)` durante `seconds`, como lo hace la app. Devuelve por donde paso la raiz.
+@discardableResult
+func drive(_ rope: inout Rope, motion: inout MotionTracker, time: inout Double, seconds: Double, side: inout Double, _ path: (Double) -> Vec) -> [Vec] {
     let frames = Int(seconds * 60)
+    var roots: [Vec] = []
     for i in 0...frames {
         let point = path(Double(i) / Double(max(frames, 1)))
         motion.add(point, time: time)
-        side = chooseRestSide(current: side, motion: motion.features(now: time), pointer: point, screen: nil)
-        rope.step(pointer: point, dt: frame, restSide: side)
+        side = chooseHandleSide(current: side, motion: motion.features(now: time), hand: point, screen: nil)
+        rope.step(pointer: point, dt: frame, side: side)
+        roots.append(rope.root)
         time += frame
     }
+    return roots
+}
+
+/// Que tan lejos queda, en promedio, la mitad de la cuerda pegada al mango del camino de la raiz.
+func distanceToPath(_ rope: Rope, _ route: [Vec]) -> Double {
+    let dense = Rope.resample(route, count: 400)
+    let near = rope.points[(Rope.segments / 2)..<Rope.segments]
+    return near.map { p in dense.map { ($0 - p).length }.min()! }.reduce(0, +) / Double(near.count)
 }
 
 func features(of path: (Double) -> Vec, seconds: Double = 0.4) -> MotionFeatures {
@@ -159,82 +170,74 @@ test("objetivos: el effort solo sube sobre donde vive Claude Code") {
 
 // MARK: La cuerda
 
-test("la cuerda en reposo: punta en el puntero, mango en la mano y largo exacto") {
-    check(Rope.restShape.count == Rope.segments + 1 && Rope.restShape[0] == .zero, "la forma de reposo empieza en la punta")
-    check(abs(Rope.measure(Rope.restShape) - Rope.length) < 1, "la forma de reposo mide el largo de la cuerda")
-    var right = Rope(at: Vec(x: 600, y: 600), restSide: 1)
-    var left = Rope(at: Vec(x: 600, y: 600), restSide: -1)
+test("el latigo en la mano: el mango sale del puntero y la cuerda cuelga") {
+    var right = Rope(hand: Vec(x: 600, y: 600), side: 1)
+    var left = Rope(hand: Vec(x: 600, y: 600), side: -1)
     for _ in 0..<240 {
-        right.step(pointer: Vec(x: 600, y: 600), dt: frame, restSide: 1)
-        left.step(pointer: Vec(x: 600, y: 600), dt: frame, restSide: -1)
+        right.step(pointer: Vec(x: 600, y: 600), dt: frame, side: 1)
+        left.step(pointer: Vec(x: 600, y: 600), dt: frame, side: -1)
     }
-    check(right.tip == Vec(x: 600, y: 600), "la punta va en el puntero")
-    check(right.handle.x > 600 && right.handle.y < 600, "mano abajo a la derecha")
-    check(left.handle.x < 600 && left.handle.y < 600, "o abajo a la izquierda")
+    check(right.hand == Vec(x: 600, y: 600), "la mano va en el puntero")
+    check(abs((right.root - right.hand).length - Rope.stockLength) < 0.5, "el mango mide lo suyo: \((right.root - right.hand).length)")
+    check(right.handleDirection.x > 0 && right.handleDirection.y > 0, "el mango apunta arriba a la derecha: \(right.handleDirection)")
+    check(left.handleDirection.x < 0 && left.handleDirection.y > 0, "o arriba a la izquierda")
+    check(right.tip.y < right.root.y - 150, "la cuerda cuelga: punta en \(right.tip.y), raiz en \(right.root.y)")
     check(abs(ropeLength(right) - Rope.length) < Rope.length * 0.03, "largo estable: \(ropeLength(right))")
     check(right.isSettled, "quieta, deja de redibujarse")
 }
 
-test("la cuerda sigue el recorrido: recto queda tendida, con giro se curva y en zigzag ondula") {
+test("arrastrada, la cuerda va detras: recta, curva o en zigzag") {
     var time = 0.0
-    var straight = Rope(at: straightPath(0)), motion = MotionTracker(), side = 1.0
-    drive(&straight, motion: &motion, time: &time, seconds: 0.5, side: &side, straightPath)
-    check(side == -1 && straight.handle.x < straight.tip.x, "hacia la derecha, la mano queda detras (a la izquierda)")
+    var straight = Rope(hand: straightPath(0)), motion = MotionTracker(), side = 1.0
+    let straightRoute = drive(&straight, motion: &motion, time: &time, seconds: 0.5, side: &side, straightPath)
+    check(straight.tip.x < straight.hand.x - 100, "hacia la derecha, la punta va atras: punta \(straight.tip.x), mano \(straight.hand.x)")
 
-    var curved = Rope(at: turnPath(0)), turnMotion = MotionTracker(), turnSide = 1.0
-    drive(&curved, motion: &turnMotion, time: &time, seconds: 0.5, side: &turnSide, turnPath)
-    var wavy = Rope(at: zigzagPath(0)), zigzagMotion = MotionTracker(), zigzagSide = 1.0
-    drive(&wavy, motion: &zigzagMotion, time: &time, seconds: 0.5, side: &zigzagSide, zigzagPath)
+    var curved = Rope(hand: turnPath(0)), turnMotion = MotionTracker(), turnSide = 1.0
+    let curvedRoute = drive(&curved, motion: &turnMotion, time: &time, seconds: 0.5, side: &turnSide, turnPath)
+    var wavy = Rope(hand: zigzagPath(0)), zigzagMotion = MotionTracker(), zigzagSide = 1.0
+    let wavyRoute = drive(&wavy, motion: &zigzagMotion, time: &time, seconds: 0.5, side: &zigzagSide, zigzagPath)
 
-    // La mitad de la cuerda cerca de la punta queda sobre el camino del mouse.
-    func distanceToPath(_ rope: Rope, _ path: (Double) -> Vec) -> Double {
-        let route = (0...400).map { path(Double($0) / 400) }
-        let near = rope.points[1...(Rope.segments / 2)]
-        return near.map { p in route.map { ($0 - p).length }.min()! }.reduce(0, +) / Double(near.count)
+    // La cuerda dibuja lo que hizo el mango.
+    for (name, rope, route) in [("recto", straight, straightRoute), ("con giro", curved, curvedRoute), ("en zigzag", wavy, wavyRoute)] {
+        check(distanceToPath(rope, route) < 15, "\(name): la cuerda va por donde paso el mango (\(distanceToPath(rope, route)) px)")
     }
-    check(distanceToPath(straight, straightPath) < 12, "recto: la cuerda va por donde paso el mouse (\(distanceToPath(straight, straightPath)) px)")
-    check(distanceToPath(curved, turnPath) < 12, "con giro: igual (\(distanceToPath(curved, turnPath)) px)")
-    check(distanceToPath(wavy, zigzagPath) < 12, "en zigzag: igual (\(distanceToPath(wavy, zigzagPath)) px)")
-    let half = Rope.segments / 2
-    let straightBend = bending(Array(straight.points[0...half])), curvedBend = bending(Array(curved.points[0...half])), wavyBend = bending(Array(wavy.points[0...half]))
-    check(straightBend.turn < 0.3, "recto queda tendida: \(straightBend.turn) rad")
-    check(curvedBend.turn > 0.9, "con giro se curva (media cuerda en un circulo de radio 140 gira 1,18 rad): \(curvedBend.turn) rad")
-    check(wavyBend.signChanges >= 3, "en zigzag ondula: \(wavyBend.signChanges) cambios de curva")
-    // Quieta, se acomoda en la mano.
-    for _ in 0..<240 { curved.step(pointer: turnPath(1), dt: frame, restSide: turnSide) }
-    check(curved.handle.y < turnPath(1).y && distanceToPath(curved, turnPath) > 12, "quieta, deja el camino y vuelve a la mano")
+    let wavyBend = bending(Array(wavy.points[(Rope.segments / 2)...]))
+    check(wavyBend.signChanges >= 2, "en zigzag ondula: \(wavyBend.signChanges) cambios de curva")
     for rope in [straight, curved, wavy] {
         check(rope.isFinite, "sin NaN")
         check(abs(ropeLength(rope) - Rope.length) < Rope.length * 0.08, "largo estable: \(ropeLength(rope))")
     }
+    // Quieta, vuelve a colgar.
+    for _ in 0..<240 { curved.step(pointer: turnPath(1), dt: frame, side: turnSide) }
+    check(curved.tip.y < curved.root.y - 150, "quieta, vuelve a colgar")
 }
 
 test("la cuerda aguanta saltos, tiempos raros y movimientos bruscos") {
-    var rope = Rope(at: Vec(x: 500, y: 500))
-    var tip = Vec(x: 500, y: 500)
+    var rope = Rope(hand: Vec(x: 500, y: 500))
+    var hand = Vec(x: 500, y: 500)
     for i in 0..<600 {
-        tip = Vec(x: 500 + 400 * sin(Double(i) / 9), y: 500 + 260 * cos(Double(i) / 13))
-        rope.step(pointer: tip, dt: frame)
+        hand = Vec(x: 500 + 400 * sin(Double(i) / 9), y: 500 + 260 * cos(Double(i) / 13))
+        rope.step(pointer: hand, dt: frame)
     }
-    check(rope.isFinite && rope.tip == tip, "movimientos bruscos: sin NaN y con la punta en el puntero")
+    check(rope.isFinite && rope.hand == hand, "movimientos bruscos: sin NaN y con la mano en el puntero")
     check(abs(ropeLength(rope) - Rope.length) < Rope.length * 0.08, "largo estable: \(ropeLength(rope))")
-    for dt in [0, -1, .nan, .infinity, 5] as [Double] { rope.step(pointer: tip, dt: dt) }
+    for dt in [0, -1, .nan, .infinity, 5] as [Double] { rope.step(pointer: hand, dt: dt) }
     check(rope.isFinite, "dt raros no rompen nada")
     rope.step(pointer: Vec(x: 5000, y: -3000), dt: frame)
-    check(rope.tip == Vec(x: 5000, y: -3000) && rope.isFinite, "un salto a otra pantalla la lleva entera")
+    check(rope.hand == Vec(x: 5000, y: -3000) && (rope.root - rope.hand).length < Rope.stockLength + 1 && rope.isFinite, "un salto a otra pantalla lleva el latigo entero")
     rope.step(pointer: Vec(x: .nan, y: 1), dt: frame)
     check(rope.isFinite, "un puntero roto se ignora")
 }
 
-test("el lado de la mano: detras del movimiento y lejos del borde") {
+test("el lado del mango: el del movimiento y lejos del borde") {
     let right = MotionFeatures(speed: 0.8, turn: 0, reversals: 0, heading: Vec(x: 1, y: 0), kind: .straight)
     let left = MotionFeatures(speed: 0.8, turn: 0, reversals: 0, heading: Vec(x: -1, y: 0), kind: .straight)
-    let still = MotionFeatures()
-    check(chooseRestSide(current: 1, motion: right, pointer: Vec(x: 800, y: 500), screen: (0, 1600)) == -1, "yendo a la derecha, mano a la izquierda")
-    check(chooseRestSide(current: -1, motion: left, pointer: Vec(x: 800, y: 500), screen: (0, 1600)) == 1, "yendo a la izquierda, mano a la derecha")
-    check(chooseRestSide(current: -1, motion: still, pointer: Vec(x: 800, y: 500), screen: (0, 1600)) == -1, "quieto, no cambia")
-    check(chooseRestSide(current: -1, motion: right, pointer: Vec(x: 60, y: 500), screen: (0, 1600)) == 1, "pegado al borde izquierdo, la mano va a la derecha")
-    check(chooseRestSide(current: 1, motion: left, pointer: Vec(x: 1570, y: 500), screen: (0, 1600)) == -1, "pegado al borde derecho, a la izquierda")
+    let screen = Bounds(minX: 0, maxX: 1600, minY: 0, maxY: 1000)
+    check(chooseHandleSide(current: -1, motion: right, hand: Vec(x: 800, y: 500), screen: screen) == 1, "yendo a la derecha, el mango apunta a la derecha")
+    check(chooseHandleSide(current: 1, motion: left, hand: Vec(x: 800, y: 500), screen: screen) == -1, "yendo a la izquierda, a la izquierda")
+    check(chooseHandleSide(current: -1, motion: MotionFeatures(), hand: Vec(x: 800, y: 500), screen: screen) == -1, "quieto, no cambia")
+    check(chooseHandleSide(current: -1, motion: left, hand: Vec(x: 60, y: 500), screen: screen) == 1, "pegado al borde izquierdo, apunta a la derecha")
+    check(chooseHandleSide(current: 1, motion: right, hand: Vec(x: 1570, y: 500), screen: screen) == -1, "pegado al borde derecho, a la izquierda")
 }
 
 // MARK: Como se mueve el mouse
@@ -258,18 +261,34 @@ test("el movimiento se reconoce: quieto, recto, con giro y en zigzag") {
     check(tracker.features(now: 5).kind == .still, "un reloj que va hacia atras empieza de nuevo")
 }
 
-test("el plan del latigazo cambia con el movimiento") {
+test("el plan del latigazo cambia con el movimiento y revienta a la vista") {
     var random = SeededRandom(seed: 3)
-    let target = Vec(x: 500, y: 500), handle = Vec(x: 700, y: 330)
-    let still = LashPlan.make(motion: MotionFeatures(), target: target, handle: handle, duration: 0.26, combo: 1, random: &random)
-    let turn = LashPlan.make(motion: features(of: turnPath), target: target, handle: handle, duration: 0.2, combo: 1, random: &random)
-    let otherTurn = LashPlan.make(motion: features(of: { t in turnPath(1 - t) }), target: target, handle: handle, duration: 0.2, combo: 1, random: &random)
-    let zigzag = LashPlan.make(motion: features(of: zigzagPath), target: target, handle: handle, duration: 0.2, combo: 6, random: &random)
-    check(still.echoDelay == nil && still.ripple == 0, "quieto: un solo chasquido, sin ondas")
+    let hand = Vec(x: 500, y: 400), handle = Rope.restHandle(side: 1)
+    let screen = Bounds(minX: 0, maxX: 1600, minY: 0, maxY: 1000)
+    func plan(_ motion: MotionFeatures, at point: Vec = hand, combo: Int = 1) -> LashPlan {
+        LashPlan.make(motion: motion, hand: point, handleDirection: handle, screen: screen, duration: 0.2, combo: combo, random: &random)
+    }
+    let still = plan(MotionFeatures())
+    check((still.direction - handle).length < 1e-9, "quieto: se lanza hacia donde apunta el mango")
+    check(still.echoDelay == nil && still.ripple == 0, "un solo chasquido, sin ondas")
+    let reach = (still.crackPoint(hand: hand) - hand).length
+    check(abs(reach - (Rope.stockLength + still.reach * Rope.length)) < 1e-6, "revienta a un mango y casi una cuerda de la mano: \(reach) px")
+    let straight = plan(features(of: straightPath))
+    check(straight.direction.x > 0.95, "en movimiento: hacia donde iba el mouse")
+    let turn = plan(features(of: turnPath)), otherTurn = plan(features(of: { t in turnPath(1 - t) }))
     check(turn.side != otherTurn.side, "el bucle sale del lado del giro")
     check(turn.reach < still.reach, "con giro la cuerda va mas curva")
+    let zigzag = plan(features(of: zigzagPath), combo: 6)
     check(zigzag.echoDelay != nil && zigzag.ripple > 0, "zigzag: ondula y truena dos veces")
     check(zigzag.strength > still.strength, "mas velocidad y combo, golpe mas fuerte")
+    // En la esquina de arriba a la derecha, lanzar hacia arriba a la derecha lo sacaria de la pantalla.
+    let corner = plan(MotionFeatures(), at: Vec(x: 1500, y: 900))
+    check(screen.fitsCrack(corner.crackPoint(hand: Vec(x: 1500, y: 900))), "en una esquina, revienta del otro lado y a la vista")
+    let low = Bounds(minX: 0, maxX: 1600, minY: 0, maxY: 500)
+    let down = Vec(x: 0.3, y: -0.95).normalized
+    let flat = LashPlan.make(motion: MotionFeatures(speed: 1, turn: 0, reversals: 0, heading: down, kind: .straight), hand: Vec(x: 500, y: 200),
+                             handleDirection: handle, screen: low, duration: 0.2, combo: 1, random: &random)
+    check(low.fitsCrack(flat.crackPoint(hand: Vec(x: 500, y: 200))), "en una pantalla baja se acuesta hasta caber: \(flat.direction)")
     let durations = [MotionFeatures(), features(of: straightPath), features(of: turnPath), features(of: zigzagPath)].map(LashPlan.motionDuration)
     check(durations.allSatisfy { $0 >= LashPlan.shortest && $0 <= LashPlan.longest }, "duraciones entre 0,14 y 0,36 s: \(durations)")
     let slow = LashPlan.motionDuration(MotionFeatures(speed: 0.2, kind: .straight)), fast = LashPlan.motionDuration(MotionFeatures(speed: 2, kind: .straight))
@@ -279,34 +298,39 @@ test("el plan del latigazo cambia con el movimiento") {
 // MARK: El latigazo
 
 /// Da un latigazo y lo deja correr cuadro a cuadro. Devuelve los golpes con su tiempo y las cuerdas.
-func lash(motion: MotionFeatures, combo: Int = 1, duration: Double? = nil, extra: Double = 0.6) -> (cracks: [(time: Double, crack: Crack)], shapes: [(time: Double, points: [Vec])], plan: LashPlan, rope: Rope) {
+func lash(motion: MotionFeatures, combo: Int = 1, duration: Double? = nil, extra: Double = 0.6, handPath: ((Double) -> Vec)? = nil) -> (cracks: [(time: Double, crack: Crack)], shapes: [(time: Double, points: [Vec], handle: Vec)], plan: LashPlan, rope: Rope) {
     var random = SeededRandom(seed: 11)
-    let target = Vec(x: 600, y: 520)
-    var rope = Rope(at: target)
-    for _ in 0..<120 { rope.step(pointer: target, dt: frame) }
-    let plan = LashPlan.make(motion: motion, target: target, handle: rope.handle, duration: duration ?? LashPlan.motionDuration(motion), combo: combo, random: &random)
+    let hand = Vec(x: 600, y: 420)
+    var rope = Rope(hand: hand)
+    for _ in 0..<120 { rope.step(pointer: hand, dt: frame) }
+    let plan = LashPlan.make(motion: motion, hand: hand, handleDirection: rope.handleDirection, screen: nil,
+                             duration: duration ?? LashPlan.motionDuration(motion), combo: combo, random: &random)
     rope.startLash(plan)
     var time = 0.0
-    var cracks: [(Double, Crack)] = [], shapes: [(Double, [Vec])] = []
+    var cracks: [(Double, Crack)] = [], shapes: [(Double, [Vec], Vec)] = []
     while time < plan.duration + extra {
         time += frame
-        for crack in rope.step(pointer: target, dt: frame) { cracks.append((time, crack)) }
-        shapes.append((time, rope.points))
+        let point = handPath.map { $0(time) } ?? hand
+        for crack in rope.step(pointer: point, dt: frame) { cracks.append((time, crack)) }
+        shapes.append((time, rope.points, rope.handleDirection))
     }
     return (cracks, shapes, plan, rope)
 }
 
-test("el latigazo revienta justo en el clic, a tiempo con el sonido") {
-    let result = lash(motion: features(of: straightPath))
+test("el latigazo revienta en la punta, lejos de la mano, a tiempo con el sonido") {
+    let result = lash(motion: MotionFeatures())
+    let hand = Vec(x: 600, y: 420)
     check(result.cracks.count == 1, "un golpe")
     if let first = result.cracks.first {
-        check(first.crack.at == result.plan.target, "en el punto del clic")
+        check((first.crack.at - result.plan.crackPoint(hand: hand)).length < 1e-6, "donde dice el plan")
+        check((first.crack.at - hand).length > Rope.length * 0.7, "lejos de la mano: a \((first.crack.at - hand).length) px")
         check(abs(first.time - result.plan.duration) <= frame + 1e-9, "a los \(result.plan.duration) s (llego a los \(first.time))")
         check(first.crack.streak.count >= 2 && first.crack.direction != .zero, "con la raya de la punta y su direccion")
     }
-    let atCrack = result.shapes.first { $0.time >= result.plan.duration }!.points
-    check((atCrack[0] - result.plan.target).length < 0.5, "la punta esta en el clic al reventar")
-    check(result.rope.tip == result.plan.target && !result.rope.isLashing, "despues vuelve al puntero")
+    let atCrack = result.shapes.first { $0.time >= result.plan.duration }!
+    check((atCrack.points[0] - result.plan.crackPoint(hand: hand)).length < 0.5, "la punta esta ahi al reventar")
+    check(atCrack.handle.dot(result.plan.direction) > 0.9, "con el mango apuntando hacia el lanzamiento")
+    check(!result.rope.isLashing && result.rope.hand == hand, "despues sigue en la mano")
     check(result.rope.isFinite && abs(ropeLength(result.rope) - Rope.length) < Rope.length * 0.08, "y la cuerda queda sana")
 }
 
@@ -321,6 +345,16 @@ test("se ve un bucle de verdad que corre del mango a la punta, cada vez mas rapi
     check(result.rope.ghosts.isEmpty, "las estelas se apagan solas")
 }
 
+test("si la mano se mueve durante el latigazo, el latigo va con ella") {
+    let moving: (Double) -> Vec = { t in Vec(x: 600 + 200 * t, y: 420) }
+    let result = lash(motion: MotionFeatures(), duration: 0.26, handPath: moving)
+    if let first = result.cracks.first {
+        check((first.crack.at - result.plan.crackPoint(hand: moving(first.time))).length < 1e-6, "revienta donde esta la mano al momento del golpe")
+    } else {
+        check(false, "hubo golpe")
+    }
+}
+
 test("en zigzag truena dos veces; un clic encima del otro no se pierde") {
     let result = lash(motion: features(of: zigzagPath))
     check(result.cracks.count == 2 && result.cracks[1].crack.isEcho, "dos golpes, el segundo es el eco")
@@ -328,13 +362,14 @@ test("en zigzag truena dos veces; un clic encima del otro no se pierde") {
         check(abs(result.cracks[1].time - result.cracks[0].time - echo) <= frame + 1e-9, "separados \(echo) s")
     }
     var random = SeededRandom(seed: 1)
-    var rope = Rope(at: Vec(x: 400, y: 400))
-    let first = LashPlan.make(motion: MotionFeatures(), target: Vec(x: 400, y: 400), handle: rope.handle, duration: 0.26, combo: 1, random: &random)
+    let hand = Vec(x: 400, y: 400)
+    var rope = Rope(hand: hand)
+    let first = LashPlan.make(motion: MotionFeatures(), hand: hand, handleDirection: rope.handleDirection, screen: nil, duration: 0.26, combo: 1, random: &random)
     rope.startLash(first)
-    rope.step(pointer: Vec(x: 400, y: 400), dt: frame)
-    let second = LashPlan.make(motion: MotionFeatures(), target: Vec(x: 420, y: 410), handle: rope.handle, duration: 0.26, combo: 2, random: &random)
+    rope.step(pointer: hand, dt: frame)
+    let second = LashPlan.make(motion: MotionFeatures(), hand: hand, handleDirection: rope.handleDirection, screen: nil, duration: 0.26, combo: 2, random: &random)
     let interrupted = rope.startLash(second)
-    check(interrupted?.at == Vec(x: 400, y: 400), "el golpe del primero sale enseguida")
+    check(interrupted.map { ($0.at - first.crackPoint(hand: hand)).length < 1e-6 } == true, "el golpe del primero sale enseguida, donde iba a caer")
 }
 
 test("con movimiento reducido el latigazo es casi inmediato") {

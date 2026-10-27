@@ -1,8 +1,9 @@
 // Dibuja el latigo y los efectos del golpe en un CGContext. Lo usan las ventanas
 // transparentes de la pantalla y el modo demo que genera las capturas.
 //
-// El latigo: un mango rigido, la cuerda trenzada que se afina hacia la punta, la
-// tralla (el ultimo tramo, mas claro y delgado) y el remate deshilachado. En el
+// El latigo: el mango rigido en la mano (el pomo en el puntero), la cuerda trenzada
+// que se afina hacia la punta, la tralla (el ultimo tramo, mas claro y delgado) y el
+// remate deshilachado. En el
 // latigazo quedan estelas de la cuerda; en el golpe, la raya de la punta al dar la
 // vuelta, la V de la onda de choque, el destello, las chispas y los gritos.
 
@@ -29,14 +30,14 @@ enum Renderer {
 
         if scene.showWhip {
             if !scene.reducedMotion { drawGhosts(scene, in: context, p: p) }
-            drawWhip(scene.rope.points, look: scene.look, level: scene.level, in: context, p: p)
+            drawWhip(scene.rope.points, hand: scene.rope.hand, look: scene.look, level: scene.level, in: context, p: p)
         }
         drawEffects(scene.effects, glow: glow, in: context, p: p)
     }
 
     /// El rectangulo (en coordenadas de pantalla) donde cae la cuerda, para redibujar solo eso.
     static func whipBounds(_ rope: Rope) -> CGRect {
-        let xs = rope.points.map(\.x), ys = rope.points.map(\.y)
+        let xs = rope.points.map(\.x) + [rope.hand.x], ys = rope.points.map(\.y) + [rope.hand.y]
         guard let minX = xs.min(), let maxX = xs.max(), let minY = ys.min(), let maxY = ys.max() else { return .null }
         return CGRect(x: minX - margin, y: minY - margin, width: maxX - minX + 2 * margin, height: maxY - minY + 2 * margin)
     }
@@ -63,7 +64,7 @@ enum Renderer {
         context.restoreGState()
     }
 
-    static func drawWhip(_ raw: [Vec], look: Look, level: Int, in context: CGContext, p: (Vec) -> CGPoint) {
+    static func drawWhip(_ raw: [Vec], hand: Vec, look: Look, level: Int, in context: CGContext, p: (Vec) -> CGPoint) {
         let lash = color(look.lash)
         let glow = color(look.glow)
         let handleColor = color(look.handle)
@@ -75,30 +76,30 @@ enum Renderer {
         func normal(_ i: Int) -> Vec { (points[min(i + 1, count - 1)] - points[max(i - 1, 0)]).normalized.perpendicular }
         let fallEnd = Int(Double(count) * 0.14)
 
-        // Mango: sigue la direccion de la cuerda mas alla del ultimo punto.
-        let butt = points[count - 1]
-        let direction = (butt - points[count - 4]).normalized
-        let grip = butt + direction * 70
+        // Mango: del pomo, en la mano, a donde nace la cuerda.
+        let root = points[count - 1]
+        let direction = (root - hand).length > 1e-6 ? (root - hand).normalized : Vec(x: 0, y: 1)
         context.saveGState()
         context.setLineCap(.round)
         context.setShadow(offset: .zero, blur: glowBlur * 0.6, color: glow.withAlphaComponent(0.45).cgColor)
         context.setStrokeColor(handleColor.cgColor)
         context.setLineWidth(11)
-        context.move(to: p(butt))
-        context.addLine(to: p(grip))
+        context.move(to: p(hand))
+        context.addLine(to: p(root))
         context.strokePath()
         context.setShadow(offset: .zero, blur: 0, color: nil)
         context.setStrokeColor((handleColor.blended(withFraction: 0.45, of: .black) ?? handleColor).cgColor)
         context.setLineWidth(2)
         let across = direction.perpendicular
+        let reach = (root - hand).length
         for k in 1...5 {
-            let c = butt + direction * (Double(k) * 11)
+            let c = hand + direction * (reach * (0.18 + 0.13 * Double(k)))
             context.move(to: p(c + across * 5.5))
             context.addLine(to: p(c - across * 5.5))
         }
         context.strokePath()
         context.setFillColor(glow.withAlphaComponent(level >= 9 ? 1 : 0.85).cgColor)
-        context.fillEllipse(in: CGRect(x: p(grip).x - 6.5, y: p(grip).y - 6.5, width: 13, height: 13))
+        context.fillEllipse(in: CGRect(x: p(hand).x - 6.5, y: p(hand).y - 6.5, width: 13, height: 13))
         context.restoreGState()
 
         // Cuerda: una cinta que se afina hacia la punta (de la tralla al mango).

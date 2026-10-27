@@ -1,11 +1,11 @@
 // La app: icono en la barra de menu y el latigo encima de toda la pantalla.
 //
 // Un solo interruptor, el mismo del plugin y de VS Code (`enabled` en config.json):
-// prendido, el puntero es un latigo. Ctrl+Cmd+L lo prende y lo apaga desde
-// cualquier app, y Esc tambien lo apaga. Los clics siguen llegando a las apps: el
-// latigazo solo se dibuja encima y revienta justo donde se dio el clic. Un
-// latigazo sobre una ventana donde vive Claude Code (VS Code, terminales, la app
-// de Claude) sube un nivel de effort a traves del puente.
+// prendido, el puntero sostiene el latigo por el mango. Ctrl+Cmd+L lo prende y lo
+// apaga desde cualquier app, y Esc tambien lo apaga. Los clics siguen llegando a las
+// apps: el latigazo solo se dibuja encima y la punta revienta lejos de la mano. Si
+// el clic o el golpe caen sobre una ventana donde vive Claude Code (VS Code,
+// terminales, la app de Claude), el effort sube un nivel a traves del puente.
 
 import AppKit
 import ServiceManagement
@@ -36,7 +36,7 @@ struct AppPreferences {
     }
 }
 
-/// Un golpe en camino: se dibuja cuando la punta llega al clic.
+/// Un golpe en camino: se dibuja cuando la punta revienta.
 private struct PendingHit {
     let combo: Int
     let strength: Double
@@ -55,11 +55,11 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     private var stats = Stats()
     private var config = LatigoConfig()
-    private var rope = Rope(at: .zero)
+    private var rope = Rope(hand: .zero)
     private var effects = Effects()
     private var motion = MotionTracker()
     private var forecast = EffortForecast()
-    private var restSide = 1.0
+    private var handleSide = 1.0
     private var combo = 0
     private var lastLashAt: TimeInterval?
     private var lastFrame = Date()
@@ -100,7 +100,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(screensChanged), name: NSApplication.didChangeScreenParametersNotification, object: nil)
         openAtLoginOnce()
         opensAtLogin = SMAppService.mainApp.status == .enabled
-        rope = Rope(at: pointer, restSide: restSide)
+        rope = Rope(hand: pointer, side: handleSide)
         applyEnabled()
         announce(atLaunch: true)
         writePresence()
@@ -156,7 +156,7 @@ final class AppController: NSObject, NSApplicationDelegate {
     /// Prendido: ventanas encima, clics y Esc. Apagado: nada (salvo el aviso que se apaga solo).
     private func applyEnabled() {
         if config.enabled {
-            rope = Rope(at: pointer, restSide: restSide)
+            rope = Rope(hand: pointer, side: handleSide)
             pendingHits.removeAll()
             if clickMonitor == nil {
                 clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in self?.click() }
@@ -208,18 +208,22 @@ final class AppController: NSObject, NSApplicationDelegate {
         combo = Rules.nextCombo(previousAt: lastLashAt, previousCombo: combo, now: now.timeIntervalSince1970)
         lastLashAt = now.timeIntervalSince1970
 
-        let target: Target = TargetApps.isClaudeHost(TargetApps.ownerName(at: point)) ? .effort : .model
-        let session = target == .effort ? bridge.liveSession(now: millis) : nil
-        let before = stats.total
-        stats = bridge.recordLash(target: target, combo: combo, now: now, known: stats).stats
-        let leveledUp = levels.progress(stats.total).tier.level > levels.progress(before).tier.level
-
         // Como venia el mouse decide el latigazo; el sonido elegido, cuanto tarda.
         let features = motion.features(now: ProcessInfo.processInfo.systemUptime)
         let style = sounds.style(config.soundStyle)
         let file = config.sound && !style.isLiveSynth ? sounds.pick(style.id, random: random.next()) : nil
         let duration = reducedMotion ? 0.08 : SoundTiming.lashDuration(motion: LashPlan.motionDuration(features), file: file)
-        let plan = LashPlan.make(motion: features, target: point, handle: rope.handle, duration: duration, combo: combo, random: &random)
+        let plan = LashPlan.make(motion: features, hand: point, handleDirection: rope.handleDirection, screen: screenBounds(at: point),
+                                 duration: duration, combo: combo, random: &random)
+
+        // Le pega a Claude si el clic o el golpe caen sobre una ventana suya.
+        let onClaude = [point, plan.crackPoint(hand: point)].contains { TargetApps.isClaudeHost(TargetApps.ownerName(at: $0)) }
+        let target: Target = onClaude ? .effort : .model
+        let session = target == .effort ? bridge.liveSession(now: millis) : nil
+        let before = stats.total
+        stats = bridge.recordLash(target: target, combo: combo, now: now, known: stats).stats
+        let leveledUp = levels.progress(stats.total).tier.level > levels.progress(before).tier.level
+
         if let interrupted = rope.startLash(plan) { land(interrupted) }
         pendingHits.append(PendingHit(combo: combo, strength: plan.strength, badge: badge(for: target, session: session, now: millis)))
 
@@ -247,7 +251,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         return ("effort ▲ \(next.rawValue)", false)
     }
 
-    /// La punta llego al clic: el golpe se ve.
+    /// La punta revento: el golpe se ve.
     private func land(_ crack: Crack) {
         let look = levels.look(stats.total)
         guard !crack.isEcho else {
@@ -279,9 +283,8 @@ final class AppController: NSObject, NSApplicationDelegate {
 
         if config.enabled {
             let features = motion.features(now: uptime)
-            let screen = NSScreen.screens.first { $0.frame.contains(NSPoint(x: point.x, y: point.y)) }?.frame
-            restSide = chooseRestSide(current: restSide, motion: features, pointer: point, screen: screen.map { ($0.minX, $0.maxX) })
-            for crack in rope.step(pointer: point, dt: dt, restSide: restSide) { land(crack) }
+            handleSide = chooseHandleSide(current: handleSide, motion: features, hand: point, screen: screenBounds(at: point))
+            for crack in rope.step(pointer: point, dt: dt, side: handleSide) { land(crack) }
             swishIfFast(features, now: uptime)
         }
         effects.step(dt: dt)
@@ -317,6 +320,12 @@ final class AppController: NSObject, NSApplicationDelegate {
         guard preferences.swishOnMove, config.sound, !rope.isLashing, features.speed > 1.3, now - lastSwishAt > 0.35 else { return }
         lastSwishAt = now
         audio.play(WhipSound.pass(speed: features.speed, random: &random), volume: 0.35)
+    }
+
+    /// La pantalla donde esta `point`.
+    private func screenBounds(at point: Vec) -> Bounds? {
+        guard let frame = NSScreen.screens.first(where: { $0.frame.contains(NSPoint(x: point.x, y: point.y)) })?.frame else { return nil }
+        return Bounds(minX: frame.minX, maxX: frame.maxX, minY: frame.minY, maxY: frame.maxY)
     }
 
     private var currentScene: Scene {

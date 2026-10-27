@@ -1,14 +1,14 @@
 # Látigo para Claude Code
 
-*Suufff… ¡CHAS!* Un látigo para darle ánimo a Claude Code. Lo prendes con **`⌃⌘L`** y tu puntero se vuelve un látigo: la cuerda sigue cada movimiento del mouse y, con cada clic, da un latigazo que revienta justo donde hiciste clic. Si el golpe cae sobre una conversación de Claude, el **effort sube un nivel**. Mientras más lo usas, más dorado, brillante y épico se pone, muy poco a poco.
+*Suufff… ¡CHAS!* Un látigo para darle ánimo a Claude Code. Lo prendes con **`⌃⌘L`** y tu puntero sostiene un látigo por el mango: la cuerda cuelga y se mece con cada movimiento del mouse. Con cada clic das un latigazo: el bucle corre del mango a la punta y la punta revienta lejos de la mano, hacia donde lo lanzaste. Si el clic o el golpe caen sobre una conversación de Claude, el **effort sube un nivel**. Mientras más lo usas, más dorado, brillante y épico se pone, muy poco a poco.
 
-![Un latigazo: la cuerda sigue el mouse, el bucle corre hasta la punta y revienta en el clic; el effort sube a high y luego a xhigh](docs/img/latigazo.gif)
+![Un latigazo: el mango en el puntero, el bucle corre hasta la punta y revienta lejos de la mano; el effort sube a high y luego a xhigh](docs/img/latigazo.gif)
 
 Son tres piezas que se hablan entre sí (todo queda en tu máquina, sin red):
 
 | Pieza | Qué hace | Dónde |
 |---|---|---|
-| **App de escritorio** (Mac) | Tu puntero es un látigo y cada clic da un latigazo encima de la pantalla: sobre VS Code, la terminal o lo que tengas | Ícono en la barra de menú · `⌃⌘L` |
+| **App de escritorio** (Mac) | Tu puntero sostiene un látigo y cada clic da un latigazo encima de la pantalla: sobre VS Code, la terminal o lo que tengas | Ícono en la barra de menú · `⌃⌘L` |
 | **Plugin de Claude Code** | Sube el effort de verdad (con `/effort`), cuenta los latigazos, y en la consola dibuja una banda encima del prompt | Consola y chat de Claude en VS Code |
 | **Extensión de VS Code** | El interruptor, el sonido, tu sesión y tus estadísticas en la barra de la izquierda | Barra de actividad de VS Code |
 
@@ -34,8 +34,8 @@ Son tres piezas que se hablan entre sí (todo queda en tu máquina, sin red):
 ## Cómo se usa
 
 1. Abre la app **Látigo**. Queda como un látigo en la barra de menú, arriba a la derecha, y desde ahí se abre sola al iniciar sesión.
-2. Presiona **`⌃⌘L`** (Control + Comando + L) en cualquier app: aparece *Látigo prendido* junto al puntero y el puntero se vuelve un látigo.
-3. Mueve el mouse: la cuerda va detrás y dibuja lo que haces. Haz clic sobre tu conversación de Claude (en VS Code, la terminal o la app de Claude): el látigo da el latigazo y **¡CHAS!**, revienta en el clic. El effort sube un nivel (`medium → high → xhigh → max`) y lo ves en el golpe: **effort ▲ high**.
+2. Presiona **`⌃⌘L`** (Control + Comando + L) en cualquier app: aparece *Látigo prendido* junto al puntero y en tu mano aparece el látigo, con el pomo del mango en el puntero.
+3. Mueve el mouse: la cuerda cuelga y se mece; si lo mueves rápido, va detrás por el mismo camino. Haz clic sobre tu conversación de Claude (en VS Code, la terminal o la app de Claude): el látigo se lanza hacia donde movías el mouse (o, quieto, hacia donde apunta el mango) y **¡CHAS!**, la punta revienta allá. El effort sube un nivel (`medium → high → xhigh → max`) y lo ves en el golpe: **effort ▲ high**.
 4. **`Esc`** o **`⌃⌘L`** lo apagan.
 
 Los clics siguen funcionando mientras tanto: el latigazo solo se dibuja encima. Un clic fuera de una conversación de Claude es puro desahogo: suena, revienta y cuenta para tu nivel, pero no toca el effort. Varios seguidos (menos de 1,5 s entre uno y otro) hacen combo: `x2 ¡DOBLE!`, `x3 ¡TRIPLE!`, `x5 ¡FURIA!`, `x7 ¡IMPARABLE!`, `x10 ¡LEYENDA!`, `x20 ¡¡DIOS DEL LÁTIGO!!`.
@@ -44,26 +44,27 @@ Para volver al effort de antes: `/latigo calma` en Claude Code, o apagar el lát
 
 ## App de escritorio
 
-| La cuerda sigue tu movimiento: en curva… | …o en zigzag |
+| En la mano: el mango en el puntero y la cuerda colgando | Arrastrado, va detrás por el mismo camino |
 |---|---|
-| ![La cuerda curvada después de mover el mouse en círculo](docs/img/pantalla-curva.png) | ![La cuerda en zigzag después de sacudir el mouse](docs/img/pantalla-zigzag.png) |
-| **El latigazo: un bucle corre del mango a la punta** | **Revienta justo en el clic y sube el effort** |
-| ![El bucle del latigazo recorriendo la cuerda, con estelas](docs/img/pantalla-bucle.png) | ![El golpe en el clic con el aviso effort ▲ high](docs/img/pantalla-golpe.png) |
+| ![El látigo colgando del mango, con el pomo en el puntero](docs/img/pantalla-reposo.png) | ![La cuerda siguiendo la curva que hizo el mango](docs/img/pantalla-curva.png) |
+| **El latigazo: un bucle corre del mango a la punta** | **La punta revienta lejos de la mano y sube el effort** |
+| ![El bucle del latigazo recorriendo la cuerda, con estelas](docs/img/pantalla-bucle.png) | ![El golpe en la punta con el aviso effort ▲ high](docs/img/pantalla-golpe.png) |
 
-- **La punta va en tu puntero.** Cuando mueves el mouse, la cuerda va detrás por el mismo camino: en línea recta queda tendida, en curva se curva y en zigzag ondula. Quieta, se acomoda como un látigo en la mano, del lado contrario al último movimiento y lejos del borde de la pantalla.
-- **El latigazo es como el de un látigo de verdad.** La mano tira hacia atrás, la cuerda se tiende hacia el clic y un bucle sale del mango y corre hasta la punta, cada vez más rápido. Cuando llega, la punta da la vuelta y revienta **justo donde hiciste clic**. Quedan estelas de la cuerda, la raya de la punta y la onda de choque.
+- **Lo sostienes por el mango.** El pomo va en tu puntero; la cuerda cuelga y se mece. Si mueves el mouse rápido, va detrás por el mismo camino: en línea recta queda tendida, en curva se curva y en zigzag ondula. El mango apunta hacia donde te mueves y nunca contra el borde de la pantalla.
+- **El latigazo es como el de un látigo de verdad.** La muñeca apunta el mango hacia el lanzamiento, la cuerda se tiende y un bucle sale del mango y corre hasta la punta, cada vez más rápido. Cuando llega, la punta da la vuelta y **revienta lejos de la mano**: a un mango y casi una cuerda de distancia. Quedan estelas de la cuerda, la raya de la punta y la onda de choque. Si mueves la mano durante el latigazo, el látigo va con ella.
+- **Hacia dónde sale:** hacia donde movías el mouse; quieto, hacia donde apunta el mango (arriba). Si el golpe fuera a caer fuera de la pantalla, sale hacia el otro lado o más acostado, para que lo veas entero.
 - **Cambia con cómo mueves el mouse:**
 
   | Movimiento | El latigazo |
   |---|---|
-  | Quieto | Por arriba, clásico |
-  | Recto | Tendido y largo; el bucle se abre del lado contrario al movimiento |
-  | Con giro | Más curvo, con el bucle del lado del giro |
+  | Quieto | Hacia donde apunta el mango, por arriba |
+  | Recto | Hacia donde ibas, tendido y largo |
+  | Con giro | Se adelanta hacia el giro, más curvo, con el bucle de ese lado |
   | Zigzag | La cuerda ondula y truena dos veces |
 
   Mientras más rápido, más corto (de 0,14 a 0,36 s), más fuerte y con más chispas.
 - **El golpe:** destello, onda de choque, chispas del color de tu nivel y el grito del nivel (de `¡CHAS!` a `❂¡¡CHAAAAS!!❂`). Encima, lo que le hizo al effort: **effort ▲ high**, *effort ya en max* o *sin sesión de Claude Code*.
-- **Sube el effort solo sobre Claude:** VS Code (y Cursor, Windsurf, VSCodium), Terminal, iTerm2, Warp, Ghostty, kitty, Alacritty, WezTerm y la app de Claude. Necesita el plugin instalado y una sesión abierta.
+- **Sube el effort solo sobre Claude:** si el clic o el golpe caen sobre VS Code (y Cursor, Windsurf, VSCodium), Terminal, iTerm2, Warp, Ghostty, kitty, Alacritty, WezTerm o la app de Claude. Necesita el plugin instalado y una sesión abierta.
 - **Menú de la barra:** el interruptor; *Esc también lo apaga* (desmárcalo si usas `Esc` para detener a Claude); el sonido, con vista previa; tu nivel; si el atajo funciona; abrir al iniciar sesión; y salir.
 - **Pantallas:** dibuja en todas las pantallas conectadas, también sobre apps a pantalla completa. Si tienes *Reducir movimiento* activo en macOS, el latigazo es casi inmediato y sin estelas.
 
@@ -99,7 +100,7 @@ El chasquido es la punta (o el bucle que viaja por la cuerda) pasando la barrera
 
 ![El sonido en la barra de VS Code: interruptor, desplegable y Probar](vscode/images/screenshots/sonidos.png)
 
-En todas partes **el chasquido cae justo con el golpe**: en la app, cuando la punta llega al clic; en la consola, cuando la banda revienta. En la app, *Zumbido al mover el látigo* agrega un soplido corto cuando mueves el mouse rápido (viene apagado).
+En todas partes **el chasquido cae justo con el golpe**: en la app, cuando la punta revienta; en la consola, cuando la banda revienta. En la app, *Zumbido al mover el látigo* agrega un soplido corto cuando mueves el mouse rápido (viene apagado).
 
 Créditos: [assets/sonidos/CREDITOS.md](assets/sonidos/CREDITOS.md).
 
@@ -241,7 +242,7 @@ Comparten el látigo: un latigazo al effort desde la pantalla o desde VS Code la
 ```
 claude plugin validate ./ && claude plugin test ./            # plugin: 110 pruebas
 cd vscode && npm ci --include=dev && npm test                  # extensión: 191 unitarias + 36 en VS Code real
-desktop/build.sh --test                                        # app de escritorio + 203 comprobaciones
+desktop/build.sh --test                                        # app de escritorio + 209 comprobaciones
 python scripts/e2e_puente.py --claude "$(which claude)"        # 22 de punta a punta con Claude Code real
 ```
 

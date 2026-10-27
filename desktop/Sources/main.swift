@@ -51,10 +51,10 @@ enum Demo {
         var badge: String?
         var combo: Int
         let look: Look
-        let screen: (minX: Double, maxX: Double)
+        let screen: Bounds
 
-        init(start: Vec, look: Look, combo: Int, screen: (minX: Double, maxX: Double)) {
-            rope = Rope(at: start)
+        init(start: Vec, look: Look, combo: Int, screen: Bounds) {
+            rope = Rope(hand: start)
             self.look = look
             self.combo = combo
             self.screen = screen
@@ -62,8 +62,8 @@ enum Demo {
 
         mutating func tick(_ point: Vec, dt: Double = 1.0 / 60) {
             motion.add(point, time: time)
-            side = chooseRestSide(current: side, motion: motion.features(now: time), pointer: point, screen: screen)
-            for crack in rope.step(pointer: point, dt: dt, restSide: side) {
+            side = chooseHandleSide(current: side, motion: motion.features(now: time), hand: point, screen: screen)
+            for crack in rope.step(pointer: point, dt: dt, side: side) {
                 effects.crack(crack, look: look, combo: crack.isEcho ? 1 : combo, strength: plan?.strength ?? 1, reducedMotion: false, random: &random)
                 if !crack.isEcho, let badge { effects.badge(badge, isMuted: false, at: crack.at, combo: combo) }
             }
@@ -79,9 +79,10 @@ enum Demo {
             }
         }
 
-        mutating func click(at point: Vec, badge: String?) {
+        mutating func click(badge: String?) {
             let features = motion.features(now: time)
-            let lash = LashPlan.make(motion: features, target: point, handle: rope.handle, duration: LashPlan.motionDuration(features), combo: combo, random: &random)
+            let lash = LashPlan.make(motion: features, hand: rope.hand, handleDirection: rope.handleDirection, screen: screen,
+                                     duration: LashPlan.motionDuration(features), combo: combo, random: &random)
             plan = lash
             self.badge = badge
             rope.startLash(lash)
@@ -95,7 +96,7 @@ enum Demo {
         let total: Int
         let combo: Int
         let path: Path
-        /// Donde se da el clic, en proporcion del fondo (0…1, y hacia arriba).
+        /// Donde queda la mano (y se da el clic), en proporcion del fondo (0…1, y hacia arriba).
         let point: (x: Double, y: Double)
         /// Proporcion del latigazo cuando se toma la foto (nil: sin clic, la cuerda en reposo).
         let at: Double?
@@ -103,22 +104,22 @@ enum Demo {
     }
 
     static let shots = [
-        Shot(name: "pantalla-curva", total: 230, combo: 1, path: .curve, point: (0.47, 0.42), at: nil, badge: nil),
-        Shot(name: "pantalla-zigzag", total: 900, combo: 1, path: .zigzag, point: (0.6, 0.55), at: nil, badge: nil),
-        Shot(name: "pantalla-bucle", total: 230, combo: 1, path: .straight, point: (0.47, 0.6), at: 0.6, badge: nil),
-        Shot(name: "pantalla-golpe", total: 1320, combo: 1, path: .curve, point: (0.47, 0.6), at: 1.12, badge: "effort ▲ high"),
-        Shot(name: "pantalla-combo-nivel14", total: 7100, combo: 6, path: .zigzag, point: (0.47, 0.6), at: 1.2, badge: "effort ▲ max"),
+        Shot(name: "pantalla-reposo", total: 230, combo: 1, path: .still, point: (0.42, 0.78), at: nil, badge: nil),
+        Shot(name: "pantalla-curva", total: 230, combo: 1, path: .curve, point: (0.47, 0.45), at: nil, badge: nil),
+        Shot(name: "pantalla-bucle", total: 230, combo: 1, path: .straight, point: (0.3, 0.2), at: 0.6, badge: nil),
+        Shot(name: "pantalla-golpe", total: 1320, combo: 1, path: .straight, point: (0.3, 0.22), at: 1.15, badge: "effort ▲ high"),
+        Shot(name: "pantalla-combo-nivel14", total: 7100, combo: 6, path: .zigzag, point: (0.3, 0.22), at: 1.2, badge: "effort ▲ max"),
     ]
 
     static func run(outputDirectory: String, background: String, levels: Levels) {
         let canvas = Canvas(background: background)
         for shot in shots {
             let tip = Vec(x: shot.point.x * canvas.pointsWide, y: shot.point.y * canvas.pointsHigh)
-            var run = Run(start: position(shot.path, end: tip, t: 0), look: levels.look(shot.total), combo: shot.combo, screen: (0, canvas.pointsWide))
-            for _ in 0..<60 { run.tick(position(shot.path, end: tip, t: 0)) }
+            var run = Run(start: position(shot.path, end: tip, t: 0), look: levels.look(shot.total), combo: shot.combo, screen: canvas.bounds)
+            for _ in 0..<90 { run.tick(position(shot.path, end: tip, t: 0)) }
             run.move(shot.path, to: tip, seconds: 0.6)
             if let at = shot.at {
-                run.click(at: tip, badge: shot.badge)
+                run.click(badge: shot.badge)
                 let until = run.time + (run.plan?.duration ?? 0.2) * at
                 while run.time < until { run.tick(tip) }
             }
@@ -131,9 +132,9 @@ enum Demo {
         let canvas = Canvas(background: background)
         let total = 1320
         let look = levels.look(total), level = levels.progress(total).tier.level
-        let first = Vec(x: canvas.pointsWide * 0.36, y: canvas.pointsHigh * 0.45)
-        let second = Vec(x: canvas.pointsWide * 0.64, y: canvas.pointsHigh * 0.5)
-        var run = Run(start: position(.curve, end: first, t: 0), look: look, combo: 1, screen: (0, canvas.pointsWide))
+        let first = Vec(x: canvas.pointsWide * 0.34, y: canvas.pointsHigh * 0.4)
+        let second = Vec(x: canvas.pointsWide * 0.6, y: canvas.pointsHigh * 0.34)
+        var run = Run(start: position(.curve, end: first, t: 0), look: look, combo: 1, screen: canvas.bounds)
         var index = 0
         func shoot(_ run: Run) {
             if Int((run.time * 60).rounded()) % 2 == 0 {
@@ -143,7 +144,7 @@ enum Demo {
         }
         for _ in 0..<30 { run.tick(position(.curve, end: first, t: 0)) }
         run.move(.curve, to: first, seconds: 0.7, onFrame: shoot)
-        run.click(at: first, badge: "effort ▲ high")
+        run.click(badge: "effort ▲ high")
         for _ in 0..<54 { run.tick(first); shoot(run) }
         let across = (second - first).normalized.perpendicular
         let steps = 40
@@ -153,7 +154,7 @@ enum Demo {
             shoot(run)
         }
         run.combo = 2
-        run.click(at: second, badge: "effort ▲ xhigh")
+        run.click(badge: "effort ▲ xhigh")
         for _ in 0..<70 { run.tick(second); shoot(run) }
         print("\(index) cuadros en \(outputDirectory)")
     }
@@ -164,6 +165,7 @@ enum Demo {
         let scale = 2.0
         var pointsWide: Double { Double(bitmap.pixelsWide) / scale }
         var pointsHigh: Double { Double(bitmap.pixelsHigh) / scale }
+        var bounds: Bounds { Bounds(minX: 0, maxX: pointsWide, minY: 0, maxY: pointsHigh) }
 
         init(background: String) {
             guard let image = NSImage(contentsOfFile: background),

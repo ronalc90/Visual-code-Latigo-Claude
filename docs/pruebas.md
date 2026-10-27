@@ -8,7 +8,7 @@ Son cinco capas, de la regla más chica al programa real funcionando. Todas pasa
 | Plugin de Claude Code | `tests/mod.test.tsx` | 63 | `claude plugin test ./` |
 | Extensión, unitarias | `vscode/test/unit/` | 191 | `cd vscode && npm run test:unit` |
 | Extensión, integración (VS Code real) | `vscode/test/integration/` | 36 | `cd vscode && npm run test:integration` |
-| App de escritorio | `desktop/Tests/main.swift` | 203 comprobaciones | `desktop/build.sh --test` |
+| App de escritorio | `desktop/Tests/main.swift` | 209 comprobaciones | `desktop/build.sh --test` |
 | Punta a punta con Claude Code real | `scripts/e2e_puente.py` | 22 | `python scripts/e2e_puente.py --claude "$(which claude)"` |
 
 Además, `claude plugin validate ./` revisa el manifiesto, el marketplace y los hooks, y los dos lados pasan la revisión de tipos de TypeScript en modo estricto.
@@ -99,27 +99,31 @@ Corre el plugin dentro del motor de pruebas de Claude Code, con el disco, el rel
 - **Niveles:** los 14 salen de `levels.ts`, y la interpolación de colores y chispas da lo mismo que `lookFor` en TypeScript.
 - **Reglas:** combos, conteos y fusión por el mayor.
 - **Effort:** sube de a un nivel con tope en `max` y sale el mayor entre el de la sesión y el forzado. El pronóstico del golpe sigue a los latigazos rápidos (high, xhigh, max, ya en max) y vuelve a contar cuando la sesión habla.
-- **La cuerda en reposo:**
-  - La forma en la mano mide exactamente el largo de la cuerda.
-  - La punta va en el puntero y la mano descansa abajo, a la derecha o a la izquierda.
-  - Quieta, deja de redibujarse.
-- **La cuerda sigue el recorrido:** recto, con giro y en zigzag, la mitad cerca de la punta queda a menos de 12 px del camino del mouse. Recto queda tendida, con giro se curva y en zigzag ondula. Quieta, vuelve a la mano.
+- **El látigo en la mano:**
+  - La mano va en el puntero, y el mango mide lo suyo y apunta arriba, a la derecha o a la izquierda.
+  - La cuerda cuelga, con el largo estable.
+  - Quieta, deja de redibujarse (la corrección que impide que se estire no le mete energía).
+- **Arrastrada, va detrás:** hacia la derecha, la punta queda atrás. Recto, con giro y en zigzag, la mitad pegada al mango queda a menos de 15 px del camino que hizo el mango, y en zigzag ondula. Quieta, vuelve a colgar.
 - **Aguanta todo:** movimientos bruscos, `dt` de 0, negativo, NaN, infinito o enorme, un salto a otra pantalla y un puntero roto, sin NaN y con el largo estable.
-- **El lado de la mano:** detrás del movimiento y lejos del borde de la pantalla.
+- **El lado del mango:** el del movimiento y lejos del borde de la pantalla.
 - **El movimiento se reconoce:** quieto, recto, con giro (con su signo), zigzag y sacudida. Más rápido, más velocidad, y un reloj que va hacia atrás empieza de nuevo.
 - **El plan del latigazo cambia con el movimiento:**
+  - quieto, se lanza hacia donde apunta el mango; en movimiento, hacia donde iba el mouse;
+  - revienta a un mango y casi una cuerda de la mano;
+  - en una esquina sale del otro lado, y en una pantalla baja se acuesta hasta caber, siempre con lugar para el grito y la insignia;
   - el bucle sale del lado del giro;
   - con giro, la cuerda va más curva;
   - en zigzag ondula y truena dos veces;
   - más velocidad y combo dan un golpe más fuerte;
   - la duración va de 0,14 a 0,36 s, y un tirón rápido truena antes.
 - **El latigazo:**
-  - Revienta en el punto del clic justo a la duración pedida (con un cuadro de margen), con la raya de la punta.
+  - La punta revienta lejos de la mano, donde dice el plan, justo a la duración pedida (con un cuadro de margen), con la raya de la punta y el mango apuntando al lanzamiento.
+  - Si la mano se mueve durante el latigazo, el látigo va con ella.
   - La cuerda se cruza consigo misma: es un rizo de verdad. El bucle entra por el mango, va siempre hacia la punta y acelera.
   - En zigzag hay un eco a los 30 ms.
   - Un clic encima del otro no pierde el primer golpe.
   - Con movimiento reducido es casi inmediato.
-  - Después la cuerda vuelve al puntero sana.
+  - Después la cuerda sigue en la mano, sana.
 - **El golpe:**
   - Más chispas con más nivel y combo.
   - La raya y la V de la onda de choque, que desaparecen con movimiento reducido.

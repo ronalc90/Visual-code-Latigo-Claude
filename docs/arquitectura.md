@@ -78,10 +78,25 @@ Una app de Mac en Swift, sin dependencias, que dibuja el látigo encima de toda 
 Cómo funciona:
 
 - **Ventanas:** son transparentes, van sobre todo (nivel *screen saver*, en todos los escritorios) e **ignoran el mouse**, así que los clics pasan a la app de abajo. La app sigue la posición del puntero cuadro a cuadro y escucha los clics con un monitor global (los de mouse no piden permisos). Con la cuerda quieta no redibuja nada; mientras se mueve, solo la zona de la cuerda.
-- **La cuerda en reposo:** 40 tramos (Verlet, con restricciones de largo y algo de rigidez hacia el mango). La punta va en el puntero y cada punto se acerca a donde estuvo la punta hace un instante, a su misma distancia de cuerda: así la cuerda dibuja el recorrido (recto, curva, zigzag). Quieta, se acomoda en la mano, abajo y detrás del último movimiento, lejos del borde de la pantalla. Una pasada final desde la punta impide que se estire.
-- **El latigazo** (`LashState`): la mano tira hacia atrás y da un golpe de muñeca; la cuerda se tiende hacia el clic; un rizo de verdad (la cuerda se cruza consigo misma) sale del mango y corre hacia la punta cada vez más rápido; cuando llega, la punta da la vuelta y revienta justo en el clic. Después la cuerda vuelve a la física con la velocidad que traía, y el rebote sale solo.
-- **Cambia con el movimiento** (`MotionTracker` → `LashPlan`): quieto, un latigazo por arriba; recto, la cuerda más tendida; con giro, más curva y con el rizo del lado del giro; en zigzag, la cuerda ondula y truena dos veces. Mientras más rápido, más corto (de 0,14 a 0,36 s) y más fuerte.
-- **Effort:** si debajo del clic hay una ventana de VS Code, una terminal o la app de Claude (por el nombre de su dueño, que no pide grabar la pantalla), el golpe suma en `stats.json` y, si hay una sesión viva, sube `effort.json`. El plugin lo aplica con `/effort`. En el golpe se ve a qué nivel subió.
+- **El látigo en la mano:**
+  - El puntero es la mano y sostiene el mango (66 px) por el pomo. El mango apunta arriba, hacia el lado del último movimiento y lejos del borde, y se inclina contra el movimiento.
+  - De su punta sale la cuerda: 40 tramos (Verlet, con restricciones de largo), con gravedad y más rígida cerca del mango.
+  - Arrastrada rápido, cada punto se acerca a donde estuvo la raíz hace un instante, a su misma distancia de cuerda. Así va detrás por el mismo camino (recto, curva, zigzag).
+  - Una pasada final desde el mango impide que se estire, y su corrección no se vuelve velocidad: si se volviera, la gravedad y esa corrección harían que la cuerda nunca quedara quieta.
+- **El latigazo** (`LashState`):
+  - La muñeca apunta el mango hacia el lanzamiento y da un golpe hacia adelante, y la cuerda se tiende.
+  - Un rizo de verdad (la cuerda se cruza consigo misma) sale del mango y corre hacia la punta cada vez más rápido. Cuando llega, la punta da la vuelta y revienta lejos de la mano, a `mango + reach × largo` en la dirección del lanzamiento.
+  - Todo se calcula desde la mano de cada cuadro, así que si la mano se mueve, el látigo va con ella.
+  - Después la cuerda vuelve a la física con la velocidad que traía, y el rebote sale solo.
+- **Hacia dónde y cómo** (`MotionTracker` → `LashPlan`):
+  - Se lanza hacia donde iba el mouse; quieto, hacia donde apunta el mango.
+  - Recto, la cuerda va más tendida. Con giro se adelanta hacia el giro, más curva y con el rizo de ese lado. En zigzag ondula y truena dos veces.
+  - Mientras más rápido, más corto (de 0,14 a 0,36 s) y más fuerte.
+  - Si el golpe cayera fuera de la pantalla (o sin lugar arriba para el grito y la insignia), se prueba en espejo y cada vez más acostado hasta que cabe.
+- **Effort:**
+  - Si debajo del clic o del golpe hay una ventana de VS Code, una terminal o la app de Claude, el golpe suma en `stats.json` y, si hay una sesión viva, sube `effort.json`. La ventana se reconoce por el nombre de su dueño, que no pide grabar la pantalla.
+  - El plugin lo aplica con `/effort`.
+  - En el golpe se ve a qué nivel subió.
 - **Atajo:** `⌃⌘L` se registra en exclusiva con Carbon. Si otra app ya lo tiene en exclusiva, la app lo avisa en el menú y en `desktop.json` (`hotkey: "ocupado"`). macOS no deja ver los registros que no son exclusivos. Al abrirse, la app cierra cualquier otra copia suya, y la primera vez que se abre desde Aplicaciones queda para abrir al iniciar sesión. `Latigo --diagnostico` dice si la app está abierta, si es ella la que tiene el atajo, y cómo están el puente y la sesión.
 - **Presencia:** la app escribe `desktop.json` cada 2 s: si el puntero es un látigo y el estado del atajo. VS Code lo muestra en su tarjeta de la app.
 
